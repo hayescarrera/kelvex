@@ -1,0 +1,586 @@
+import { useState, useEffect } from 'react'
+import { Sun, Moon, User, Bell, Shield, Database, Key, AlertTriangle, Check, Loader2, Download, Plus, Trash2, Play, Mail, Globe, MessageSquare, Phone, X, Clock, Users } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
+import { useSiteContext } from '../contexts/SiteContext'
+import PageHeader from '../components/ui/PageHeader'
+import { api } from '../lib/api'
+import type { NotificationChannelRecord, NotificationChannelCreate } from '../lib/api'
+import {
+  useNotificationChannels,
+  useCreateNotificationChannel,
+  useUpdateNotificationChannel,
+  useDeleteNotificationChannel,
+  useTestNotificationChannel,
+  useNotificationLogs,
+} from '../hooks/useNotifications'
+// Team management moved to /team — UserManagementPage
+
+type TempUnit = 'F' | 'C'
+
+export default function SettingsPage() {
+  const { theme, toggle } = useTheme()
+  const { user, logout } = useAuth()
+  const { facilities } = useSiteContext()
+  const [activeSection, setActiveSection] = useState('profile')
+
+  // Profile state
+  const [fullName, setFullName] = useState(user?.full_name ?? '')
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileSaved, setProfileSaved] = useState(false)
+
+  // Temperature unit — persisted in localStorage
+  const [tempUnit, setTempUnit] = useState<TempUnit>(() =>
+    (localStorage.getItem('coldgrid_temp_unit') as TempUnit) || 'F'
+  )
+
+  // Notification channel management
+  const { data: channelsData, isLoading: channelsLoading } = useNotificationChannels()
+  const { data: logsData } = useNotificationLogs(20)
+  const createChannel = useCreateNotificationChannel()
+  const updateChannel = useUpdateNotificationChannel()
+  const deleteChannel = useDeleteNotificationChannel()
+  const testChannel = useTestNotificationChannel()
+  const [showAddChannel, setShowAddChannel] = useState(false)
+  const [newChannel, setNewChannel] = useState<NotificationChannelCreate>({
+    name: '', channel_type: 'email', config: {}, enabled: true,
+  })
+  const [showLogs, setShowLogs] = useState(false)
+
+  // Team management moved to /team
+
+  // Export state
+  const [exporting, setExporting] = useState(false)
+  const [exportDone, setExportDone] = useState(false)
+
+  // Delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteText, setDeleteText] = useState('')
+
+  useEffect(() => {
+    if (user) setFullName(user.full_name)
+  }, [user])
+
+  // ── Handlers ─────────────────────────────────
+
+  const handleSaveProfile = async () => {
+    if (!fullName.trim()) return
+    setProfileSaving(true)
+    try {
+      await api.updateProfile({ full_name: fullName.trim() })
+      setProfileSaved(true)
+      toast.success('Profile saved')
+      setTimeout(() => setProfileSaved(false), 2000)
+    } catch {
+      toast.error('Failed to save profile')
+    } finally {
+      setProfileSaving(false)
+    }
+  }
+
+  const handleTempUnitChange = (unit: TempUnit) => {
+    setTempUnit(unit)
+    localStorage.setItem('coldgrid_temp_unit', unit)
+  }
+
+  const handleAddChannel = async () => {
+    if (!newChannel.name.trim()) return
+    try {
+      await createChannel.mutateAsync(newChannel)
+      toast.success('Notification channel added')
+      setShowAddChannel(false)
+      setNewChannel({ name: '', channel_type: 'email', config: {}, enabled: true })
+    } catch {
+      toast.error('Failed to add channel')
+    }
+  }
+
+  // handleInvite moved to /team page
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const rows = [['Facility', 'City', 'State', 'SqFt', 'Zone Types']]
+      for (const f of facilities) {
+        rows.push([f.name, f.city || '', f.state || '', String(f.sqft || ''), (f.zone_types || []).join('; ')])
+      }
+      const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `kelvex-export-${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      setExportDone(true)
+      setTimeout(() => setExportDone(false), 3000)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const sections = [
+    { id: 'profile', label: 'Profile', icon: <User size={15} /> },
+    { id: 'appearance', label: 'Appearance', icon: <Sun size={15} /> },
+    { id: 'notifications', label: 'Notifications', icon: <Bell size={15} /> },
+    { id: 'team', label: 'Team', icon: <Users size={15} /> },
+    { id: 'security', label: 'Security', icon: <Shield size={15} /> },
+    { id: 'data', label: 'Data & Export', icon: <Database size={15} /> },
+    { id: 'api', label: 'API Keys', icon: <Key size={15} /> },
+  ]
+
+  const channelTypeIcon = (t: string) =>
+    t === 'email' ? <Mail size={14} /> : t === 'slack' ? <MessageSquare size={14} /> : t === 'sms' ? <Phone size={14} /> : <Globe size={14} />
+
+  return (
+    <div className="page-container">
+      <PageHeader title="Settings" subtitle="Platform configuration" />
+      <div className="content-area" style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, alignItems: 'start' }}>
+        {/* Left nav */}
+        <div className="card" style={{ position: 'sticky', top: 80 }}>
+          <div className="card-body" style={{ padding: 6 }}>
+            {sections.map(s => (
+              <button
+                key={s.id}
+                onClick={() => setActiveSection(s.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px',
+                  border: 'none', borderRadius: 'var(--radius-sm)', background: activeSection === s.id ? 'var(--accent-muted)' : 'none',
+                  color: activeSection === s.id ? 'var(--accent)' : 'var(--text-secondary)', fontSize: '12.5px',
+                  fontWeight: activeSection === s.id ? 600 : 500, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                  transition: 'all 120ms ease',
+                }}
+              >
+                {s.icon} {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right content */}
+        <div className="stack-lg">
+          {activeSection === 'profile' && (
+            <div className="card">
+              <div className="card-header"><h3>Profile</h3></div>
+              <div className="card-body" style={{ maxWidth: 480 }}>
+                <div className="field" style={{ marginBottom: 14 }}>
+                  <label>Full name</label>
+                  <input
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                    placeholder="Your name"
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 14 }}>
+                  <label>Email</label>
+                  <input value={user?.email ?? ''} disabled style={{ opacity: 0.6 }} />
+                </div>
+                <div className="field" style={{ marginBottom: 14 }}>
+                  <label>Organization ID</label>
+                  <input value={user?.org_id ?? ''} disabled style={{ opacity: 0.6, fontFamily: 'monospace', fontSize: 12 }} />
+                </div>
+                <button
+                  className="btn-primary"
+                  style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}
+                  onClick={handleSaveProfile}
+                  disabled={profileSaving || fullName.trim() === user?.full_name}
+                >
+                  {profileSaving ? <><Loader2 size={14} className="spin" /> Saving...</> :
+                   profileSaved ? <><Check size={14} /> Saved</> :
+                   'Save Changes'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'appearance' && (
+            <div className="card">
+              <div className="card-header"><h3>Appearance</h3></div>
+              <div className="card-body">
+                <div className="setting-row">
+                  <div>
+                    <div className="cell-primary">Theme</div>
+                    <div className="text-muted">Switch between light and dark mode</div>
+                  </div>
+                  <button className="btn-secondary" onClick={toggle}>
+                    {theme === 'light' ? <><Moon size={14} /> Dark Mode</> : <><Sun size={14} /> Light Mode</>}
+                  </button>
+                </div>
+                <div className="setting-row">
+                  <div>
+                    <div className="cell-primary">Temperature unit</div>
+                    <div className="text-muted">Display temperatures in Fahrenheit or Celsius</div>
+                  </div>
+                  <select
+                    value={tempUnit}
+                    onChange={e => handleTempUnitChange(e.target.value as TempUnit)}
+                    style={{
+                      padding: '6px 10px', fontSize: '12.5px', border: '1px solid var(--input-border)',
+                      borderRadius: 'var(--radius-md)', background: 'var(--input-bg)', color: 'var(--text-primary)',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <option value="F">Fahrenheit</option>
+                    <option value="C">Celsius</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'notifications' && (
+            <div className="stack-lg">
+              {/* Channels card */}
+              <div className="card">
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3>Notification Channels</h3>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => setShowLogs(!showLogs)}>
+                      <Clock size={13} /> {showLogs ? 'Hide Logs' : 'View Logs'}
+                    </button>
+                    <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => setShowAddChannel(true)}>
+                      <Plus size={13} /> Add Channel
+                    </button>
+                  </div>
+                </div>
+                <div className="card-body">
+                  {channelsLoading && <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-tertiary)' }}><Loader2 size={18} className="spin" /></div>}
+                  {!channelsLoading && (!channelsData?.channels?.length) && (
+                    <div className="empty-state" style={{ padding: '32px 20px' }}>
+                      <div className="empty-icon"><Bell size={20} /></div>
+                      <h3>No channels configured</h3>
+                      <p>Add an email, SMS, webhook, or Slack channel to receive notifications from automation rules and alerts.</p>
+                    </div>
+                  )}
+                  {channelsData?.channels?.map((ch: NotificationChannelRecord) => (
+                    <div key={ch.id} className="setting-row" style={{ gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                        <span style={{ color: 'var(--text-tertiary)' }}>{channelTypeIcon(ch.channel_type)}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <div className="cell-primary">{ch.name}</div>
+                          <div className="text-muted" style={{ fontSize: 11 }}>
+                            {ch.channel_type === 'email' && (ch.config?.recipients as string[] || []).join(', ')}
+                            {ch.channel_type === 'webhook' && (ch.config?.url as string || 'No URL')}
+                            {ch.channel_type === 'slack' && (ch.config?.channel as string || 'Slack')}
+                            {ch.channel_type === 'sms' && (ch.config?.recipients as string[] || []).join(', ')}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <label style={{ cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={ch.enabled}
+                            onChange={() => updateChannel.mutate(
+                              { channelId: ch.id, data: { enabled: !ch.enabled } },
+                              { onSuccess: () => toast.success(ch.enabled ? 'Channel disabled' : 'Channel enabled'), onError: () => toast.error('Failed to update channel') }
+                            )}
+                            style={{
+                              width: 36, height: 20, appearance: 'none', WebkitAppearance: 'none',
+                              background: ch.enabled ? 'var(--accent)' : 'var(--border-default)',
+                              borderRadius: 10, cursor: 'pointer', transition: 'background 200ms', border: 'none',
+                            }}
+                          />
+                        </label>
+                        <button
+                          className="btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: 11 }}
+                          onClick={() => testChannel.mutate(ch.id, { onSuccess: () => toast.success('Test notification sent'), onError: () => toast.error('Test failed') })}
+                          disabled={!ch.enabled}
+                          title="Send test notification"
+                        >
+                          <Play size={12} /> Test
+                        </button>
+                        <button
+                          className="btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: 11, color: 'var(--danger)' }}
+                          onClick={() => { if (confirm(`Delete channel "${ch.name}"?`)) deleteChannel.mutate(ch.id, { onSuccess: () => toast.success('Channel deleted'), onError: () => toast.error('Failed to delete channel') }) }}
+                          title="Delete channel"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add Channel Modal */}
+              {showAddChannel && (
+                <div className="card" style={{ border: '1px solid var(--accent)', position: 'relative' }}>
+                  <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3>New Notification Channel</h3>
+                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)' }} onClick={() => setShowAddChannel(false)}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div className="card-body" style={{ maxWidth: 500 }}>
+                    <div className="field" style={{ marginBottom: 12 }}>
+                      <label>Channel name</label>
+                      <input value={newChannel.name} onChange={e => setNewChannel(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Ops Team Email" />
+                    </div>
+                    <div className="field" style={{ marginBottom: 12 }}>
+                      <label>Type</label>
+                      <select
+                        value={newChannel.channel_type}
+                        onChange={e => setNewChannel(p => ({ ...p, channel_type: e.target.value, config: {} }))}
+                        style={{ padding: '6px 10px', fontSize: '12.5px', border: '1px solid var(--input-border)', borderRadius: 'var(--radius-md)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontFamily: 'inherit', width: '100%' }}
+                      >
+                        <option value="email">Email</option>
+                        <option value="sms">SMS</option>
+                        <option value="webhook">Webhook</option>
+                        <option value="slack">Slack</option>
+                      </select>
+                    </div>
+                    {newChannel.channel_type === 'email' && (
+                      <div className="field" style={{ marginBottom: 12 }}>
+                        <label>Recipients (comma-separated emails)</label>
+                        <input
+                          value={(newChannel.config?.recipients as string[] || []).join(', ')}
+                          onChange={e => setNewChannel(p => ({ ...p, config: { ...p.config, recipients: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } }))}
+                          placeholder="ops@company.com, manager@company.com"
+                        />
+                      </div>
+                    )}
+                    {newChannel.channel_type === 'sms' && (
+                      <>
+                        <div className="field" style={{ marginBottom: 12 }}>
+                          <label>Phone numbers (comma-separated, with country code)</label>
+                          <input
+                            value={(newChannel.config?.recipients as string[] || []).join(', ')}
+                            onChange={e => setNewChannel(p => ({ ...p, config: { ...p.config, recipients: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } }))}
+                            placeholder="+15551234567, +15559876543"
+                          />
+                        </div>
+                        <div style={{ padding: '8px 10px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                          <strong>Requires Twilio.</strong> Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER in your environment.
+                          Without Twilio configured, SMS alerts will be logged but not delivered.
+                        </div>
+                      </>
+                    )}
+                    {newChannel.channel_type === 'webhook' && (
+                      <div className="field" style={{ marginBottom: 12 }}>
+                        <label>Webhook URL</label>
+                        <input
+                          value={(newChannel.config?.url as string) || ''}
+                          onChange={e => setNewChannel(p => ({ ...p, config: { ...p.config, url: e.target.value } }))}
+                          placeholder="https://hooks.example.com/notify"
+                        />
+                      </div>
+                    )}
+                    {newChannel.channel_type === 'slack' && (
+                      <>
+                        <div className="field" style={{ marginBottom: 12 }}>
+                          <label>Incoming Webhook URL</label>
+                          <input
+                            value={(newChannel.config?.webhook_url as string) || ''}
+                            onChange={e => setNewChannel(p => ({ ...p, config: { ...p.config, webhook_url: e.target.value } }))}
+                            placeholder="https://hooks.slack.com/services/..."
+                          />
+                        </div>
+                        <div className="field" style={{ marginBottom: 12 }}>
+                          <label>Channel (optional)</label>
+                          <input
+                            value={(newChannel.config?.channel as string) || ''}
+                            onChange={e => setNewChannel(p => ({ ...p, config: { ...p.config, channel: e.target.value } }))}
+                            placeholder="#alerts"
+                          />
+                        </div>
+                      </>
+                    )}
+                    <button
+                      className="btn-primary"
+                      style={{ marginTop: 6 }}
+                      onClick={handleAddChannel}
+                      disabled={!newChannel.name.trim() || createChannel.isPending}
+                    >
+                      {createChannel.isPending ? <><Loader2 size={14} className="spin" /> Creating...</> : 'Create Channel'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Logs card */}
+              {showLogs && (
+                <div className="card">
+                  <div className="card-header"><h3>Recent Delivery Logs</h3></div>
+                  <div className="card-body" style={{ padding: 0 }}>
+                    {(!logsData?.logs?.length) ? (
+                      <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>No logs yet</div>
+                    ) : (
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Time</th>
+                            <th>Subject</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {logsData.logs.map(log => (
+                            <tr key={log.id}>
+                              <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{new Date(log.sent_at).toLocaleString()}</td>
+                              <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.subject}</td>
+                              <td>{log.channel_type}</td>
+                              <td>
+                                <span className={`badge ${log.status === 'sent' ? 'badge-success' : log.status === 'failed' ? 'badge-danger' : 'badge-neutral'}`}>
+                                  {log.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSection === 'team' && (
+            <div className="card">
+              <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
+                  Team management has moved to its own page with role-based access control and facility assignments.
+                </p>
+                <a href="/team" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                  Go to Team Management &rarr;
+                </a>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'security' && (
+            <div className="card">
+              <div className="card-header"><h3>Security</h3></div>
+              <div className="card-body">
+                <div className="setting-row">
+                  <div>
+                    <div className="cell-primary">Two-factor authentication</div>
+                    <div className="text-muted">Add an extra layer of security</div>
+                  </div>
+                  <span className="badge badge-neutral">Not configured</span>
+                </div>
+                <div className="setting-row">
+                  <div>
+                    <div className="cell-primary">Active sessions</div>
+                    <div className="text-muted">Manage devices signed into your account</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>1 active</span>
+                </div>
+                <div className="setting-row" style={{ borderBottom: 'none' }}>
+                  <div>
+                    <div className="cell-primary">Sign out</div>
+                    <div className="text-muted">Sign out of your current session</div>
+                  </div>
+                  <button className="btn-secondary" onClick={logout}>Sign Out</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'data' && (
+            <div className="card">
+              <div className="card-header"><h3>Data & Export</h3></div>
+              <div className="card-body">
+                <div className="setting-row">
+                  <div>
+                    <div className="cell-primary">Export facility data</div>
+                    <div className="text-muted">Download facility list as CSV ({facilities.length} facilities)</div>
+                  </div>
+                  <button
+                    className="btn-secondary"
+                    onClick={handleExport}
+                    disabled={exporting || facilities.length === 0}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                  >
+                    {exporting ? <><Loader2 size={14} className="spin" /> Exporting...</> :
+                     exportDone ? <><Check size={14} /> Downloaded</> :
+                     <><Download size={14} /> Export</>}
+                  </button>
+                </div>
+                <div className="setting-row" style={{ borderBottom: 'none' }}>
+                  <div>
+                    <div className="cell-primary">Data retention</div>
+                    <div className="text-muted">How long telemetry and event data is stored</div>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>90 days</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'api' && (
+            <div className="card">
+              <div className="card-header"><h3>API Keys</h3></div>
+              <div className="card-body">
+                <div className="empty-state" style={{ padding: '32px 20px' }}>
+                  <div className="empty-icon"><Key size={20} /></div>
+                  <h3>API keys coming soon</h3>
+                  <p>API keys will allow external systems to interact with Kelvex programmatically. This feature is under development.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Danger zone */}
+          <div className="card" style={{ borderColor: 'var(--danger-border)' }}>
+            <div className="card-header" style={{ borderBottomColor: 'var(--danger-border)' }}>
+              <h3 style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertTriangle size={14} /> Danger Zone
+              </h3>
+            </div>
+            <div className="card-body">
+              <div className="setting-row" style={{ borderBottom: 'none' }}>
+                <div>
+                  <div className="cell-primary">Delete account</div>
+                  <div className="text-muted">Permanently delete your account and all associated data</div>
+                </div>
+                {!showDeleteConfirm ? (
+                  <button
+                    className="btn-secondary"
+                    style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    Delete Account
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      placeholder='Type "DELETE" to confirm'
+                      value={deleteText}
+                      onChange={e => setDeleteText(e.target.value)}
+                      style={{ width: 180, fontSize: 12 }}
+                    />
+                    <button
+                      className="btn-secondary"
+                      style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)', fontSize: 12 }}
+                      disabled={deleteText !== 'DELETE'}
+                      onClick={() => {
+                        toast('Account deletion requires contacting support.', { icon: '\u26a0\ufe0f' })
+                        setShowDeleteConfirm(false)
+                        setDeleteText('')
+                      }}
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      style={{ fontSize: 12 }}
+                      onClick={() => { setShowDeleteConfirm(false); setDeleteText('') }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

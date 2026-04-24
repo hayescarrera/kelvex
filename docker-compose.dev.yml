@@ -1,0 +1,27 @@
+# Development overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# This restores hot-reload for both backend and frontend.
+
+version: "3.9"
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+    environment:
+      - UVICORN_RELOAD=true
+      - ENVIRONMENT=development
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://backend:8000
+    command: npm run dev -- --host 0.0.0.0

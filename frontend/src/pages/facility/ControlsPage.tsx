@@ -1,0 +1,327 @@
+import { useState } from 'react'
+import { useParams } from 'react-router-dom'
+import toast from 'react-hot-toast'
+import { Loader2, Play, Plus, X, Power, PowerOff } from 'lucide-react'
+import {
+  useSequences, useCreateSequence, useRunSequence,
+  useAutomationRules, useCreateAutomationRule, useUpdateAutomationRule,
+} from '../../hooks/useControls'
+
+const SEQUENCE_TYPES = ['pre_cool', 'load_shed', 'night_setback', 'demand_response', 'defrost', 'custom']
+const TRIGGER_METRICS = ['zone_temp', 'demand_kw', 'energy_price', 'outdoor_temp', 'schedule']
+const TRIGGER_OPERATORS = ['gt', 'lt', 'gte', 'lte', 'eq']
+const ACTION_TYPES = ['set_setpoint', 'disable_equipment', 'enable_equipment', 'run_sequence', 'send_alert']
+
+export default function ControlsPage() {
+  const { facilityId } = useParams<{ facilityId: string }>()
+  const [activeTab, setActiveTab] = useState<'sequences' | 'rules'>('sequences')
+  const [showSeqModal, setShowSeqModal] = useState(false)
+  const [showRuleModal, setShowRuleModal] = useState(false)
+
+  const { data: seqData, isLoading: seqLoading } = useSequences(facilityId!)
+  const { data: ruleData, isLoading: rulesLoading } = useAutomationRules(facilityId!)
+  const sequences = seqData?.sequences ?? []
+  const rules = ruleData?.rules ?? []
+
+  const runSequence = useRunSequence(facilityId!)
+  const updateRule = useUpdateAutomationRule(facilityId!)
+
+  const formatDateTime = (val: string | null | undefined) =>
+    val ? new Date(val).toLocaleString() : '\u2014'
+
+  const toggleRule = (ruleId: string, currentEnabled: boolean) => {
+    const enabling = !currentEnabled
+    updateRule.mutate({ ruleId, data: { enabled: enabling } as any }, {
+      onSuccess: () => toast.success(enabling ? 'Rule enabled' : 'Rule disabled'),
+      onError: () => toast.error('Failed to update rule'),
+    })
+  }
+
+  return (
+    <div className="page-container stack-lg">
+      <div className="card">
+        <div className="card-header">
+          <div className="tab-toggle">
+            <button className={activeTab === 'sequences' ? 'active' : ''} onClick={() => setActiveTab('sequences')}>
+              Sequences ({sequences.length})
+            </button>
+            <button className={activeTab === 'rules' ? 'active' : ''} onClick={() => setActiveTab('rules')}>
+              Rules ({rules.length})
+            </button>
+          </div>
+          <button
+            className="btn-primary"
+            onClick={() => activeTab === 'sequences' ? setShowSeqModal(true) : setShowRuleModal(true)}
+          >
+            <Plus size={14} /> {activeTab === 'sequences' ? 'New Sequence' : 'New Rule'}
+          </button>
+        </div>
+
+        <div className="card-body" style={{ padding: 0 }}>
+          {activeTab === 'sequences' && (
+            <>
+              {seqLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Loader2 size={24} className="spin" /></div>
+              ) : sequences.length === 0 ? (
+                <div className="empty-state">
+                  <h3>No sequences configured</h3>
+                  <p>Control sequences automate refrigeration operations like pre-cooling, load shedding, and demand response.</p>
+                  <button className="btn-ghost" style={{ marginTop: 12 }} onClick={() => setShowSeqModal(true)}>
+                    <Plus size={14} /> Create your first sequence
+                  </button>
+                </div>
+              ) : (
+                <table className="data-table">
+                  <thead>
+                    <tr><th>Name</th><th>Type</th><th>Priority</th><th>Status</th><th>Last Run</th><th>Runs</th><th style={{ width: 80 }}>Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {sequences.map((seq: any) => (
+                      <tr key={seq.id}>
+                        <td>
+                          <span className="cell-primary">{seq.name}</span>
+                          {seq.description && <span className="cell-secondary">{seq.description}</span>}
+                        </td>
+                        <td><span className="badge badge-info">{seq.sequence_type?.replace(/_/g, ' ')}</span></td>
+                        <td>{seq.priority ?? '\u2014'}</td>
+                        <td>
+                          <span className={`badge ${seq.enabled ? 'badge-success' : 'badge-neutral'}`}>
+                            <span className="badge-dot" /> {seq.enabled ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{formatDateTime(seq.last_run_at)}</td>
+                        <td>{seq.run_count ?? 0}</td>
+                        <td>
+                          <button
+                            className="icon-btn-sm"
+                            title="Run now"
+                            onClick={() => runSequence.mutate(seq.id, {
+                            onSuccess: () => toast.success('Command queued'),
+                            onError: () => toast.error('Failed to run sequence'),
+                          })}
+                            disabled={runSequence.isPending}
+                          >
+                            <Play size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          )}
+
+          {activeTab === 'rules' && (
+            <>
+              {rulesLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Loader2 size={24} className="spin" /></div>
+              ) : rules.length === 0 ? (
+                <div className="empty-state">
+                  <h3>No automation rules</h3>
+                  <p>Rules automatically trigger sequences when conditions are met — like shedding load when demand exceeds a threshold.</p>
+                  <button className="btn-ghost" style={{ marginTop: 12 }} onClick={() => setShowRuleModal(true)}>
+                    <Plus size={14} /> Create your first rule
+                  </button>
+                </div>
+              ) : (
+                <table className="data-table">
+                  <thead>
+                    <tr><th>Name</th><th>Status</th><th>Cooldown</th><th>Max/Day</th><th>Last Triggered</th><th>Today</th><th style={{ width: 60 }}></th></tr>
+                  </thead>
+                  <tbody>
+                    {rules.map((rule: any) => (
+                      <tr key={rule.id}>
+                        <td>
+                          <span className="cell-primary">{rule.name}</span>
+                          {rule.description && <span className="cell-secondary">{rule.description}</span>}
+                        </td>
+                        <td>
+                          <span className={`badge ${rule.enabled ? 'badge-success' : 'badge-neutral'}`}>
+                            <span className="badge-dot" /> {rule.enabled ? 'Active' : 'Paused'}
+                          </span>
+                        </td>
+                        <td>{rule.cooldown_minutes}m</td>
+                        <td>{rule.max_executions_per_day}</td>
+                        <td style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{formatDateTime(rule.last_triggered_at)}</td>
+                        <td>{rule.execution_count_today ?? 0}</td>
+                        <td>
+                          <button
+                            className="icon-btn-sm"
+                            title={rule.enabled ? 'Disable' : 'Enable'}
+                            onClick={() => toggleRule(rule.id, rule.enabled)}
+                          >
+                            {rule.enabled ? <PowerOff size={14} /> : <Power size={14} />}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {showSeqModal && <CreateSequenceModal facilityId={facilityId!} onClose={() => setShowSeqModal(false)} />}
+      {showRuleModal && <CreateRuleModal facilityId={facilityId!} onClose={() => setShowRuleModal(false)} />}
+    </div>
+  )
+}
+
+/* ── Create Sequence Modal ─────────────────────────────── */
+function CreateSequenceModal({ facilityId, onClose }: { facilityId: string; onClose: () => void }) {
+  const createSeq = useCreateSequence(facilityId)
+  const [form, setForm] = useState({
+    name: '', description: '', sequence_type: 'pre_cool', priority: '5',
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    createSeq.mutate({
+      name: form.name,
+      description: form.description || undefined,
+      sequence_type: form.sequence_type,
+      priority: parseInt(form.priority) || 5,
+      steps: [{ action: 'set_setpoint', target: 'all_zones', params: {} }],
+    }, {
+      onSuccess: () => { toast.success('Sequence created'); onClose() },
+      onError: () => toast.error('Failed to create sequence'),
+    })
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>New Control Sequence</h3>
+          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="modal-body">
+          <div className="field">
+            <label>Sequence name</label>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Evening Pre-Cool" required autoFocus />
+          </div>
+          <div className="field">
+            <label>Description</label>
+            <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="What this sequence does..." rows={2} />
+          </div>
+          <div className="field-row">
+            <div className="field" style={{ flex: 2 }}>
+              <label>Type</label>
+              <select value={form.sequence_type} onChange={e => setForm({ ...form, sequence_type: e.target.value })}>
+                {SEQUENCE_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+              </select>
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Priority</label>
+              <input type="number" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} min="1" max="10" />
+            </div>
+          </div>
+          {createSeq.isError && <p className="text-danger" style={{ fontSize: 12 }}>Failed to create sequence. Check your inputs.</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={createSeq.isPending}>
+              {createSeq.isPending ? 'Creating...' : <><Plus size={14} /> Create Sequence</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+/* ── Create Rule Modal ─────────────────────────────────── */
+function CreateRuleModal({ facilityId, onClose }: { facilityId: string; onClose: () => void }) {
+  const createRule = useCreateAutomationRule(facilityId)
+  const [form, setForm] = useState({
+    name: '', description: '',
+    trigger_metric: 'demand_kw', trigger_operator: 'gt', trigger_value: '',
+    action_type: 'run_sequence', cooldown: '15', maxPerDay: '10',
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    createRule.mutate({
+      name: form.name,
+      description: form.description || undefined,
+      trigger_conditions: {
+        metric: form.trigger_metric,
+        operator: form.trigger_operator,
+        value: parseFloat(form.trigger_value),
+      },
+      actions: [{ type: form.action_type, params: {} }],
+      cooldown_minutes: parseInt(form.cooldown) || 15,
+      max_executions_per_day: parseInt(form.maxPerDay) || 10,
+    }, {
+      onSuccess: () => { toast.success('Rule created'); onClose() },
+      onError: () => toast.error('Failed to create rule'),
+    })
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>New Automation Rule</h3>
+          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="modal-body">
+          <div className="field">
+            <label>Rule name</label>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Peak Demand Load Shed" required autoFocus />
+          </div>
+          <div className="field">
+            <label>Description</label>
+            <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="When to trigger and what it does" />
+          </div>
+          <div style={{ padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Trigger Condition</span>
+            <div className="field-row" style={{ marginTop: 8 }}>
+              <div className="field" style={{ flex: 2 }}>
+                <label>Metric</label>
+                <select value={form.trigger_metric} onChange={e => setForm({ ...form, trigger_metric: e.target.value })}>
+                  {TRIGGER_METRICS.map(m => <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label>Operator</label>
+                <select value={form.trigger_operator} onChange={e => setForm({ ...form, trigger_operator: e.target.value })}>
+                  {TRIGGER_OPERATORS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 1 }}>
+                <label>Value</label>
+                <input type="number" value={form.trigger_value} onChange={e => setForm({ ...form, trigger_value: e.target.value })} placeholder="500" required />
+              </div>
+            </div>
+          </div>
+          <div className="field-row">
+            <div className="field" style={{ flex: 2 }}>
+              <label>Action</label>
+              <select value={form.action_type} onChange={e => setForm({ ...form, action_type: e.target.value })}>
+                {ACTION_TYPES.map(a => <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>)}
+              </select>
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Cooldown (min)</label>
+              <input type="number" value={form.cooldown} onChange={e => setForm({ ...form, cooldown: e.target.value })} />
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Max/day</label>
+              <input type="number" value={form.maxPerDay} onChange={e => setForm({ ...form, maxPerDay: e.target.value })} />
+            </div>
+          </div>
+          {createRule.isError && <p className="text-danger" style={{ fontSize: 12 }}>Failed to create rule.</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={createRule.isPending}>
+              {createRule.isPending ? 'Creating...' : <><Plus size={14} /> Create Rule</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

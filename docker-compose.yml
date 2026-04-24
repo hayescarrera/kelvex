@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: coldgrid-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-coldgrid}:${POSTGRES_PASSWORD:-coldgrid_dev}@db:5432/${POSTGRES_DB:-coldgrid}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - CREDENTIAL_ENCRYPTION_KEY=${CREDENTIAL_ENCRYPTION_KEY:-}
+      - OPENEI_API_KEY=${OPENEI_API_KEY:-}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - UVICORN_RELOAD=${UVICORN_RELOAD:-false}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost,http://localhost:80,http://localhost:5173}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: bash start.sh
+    restart: unless-stopped
+
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: coldgrid-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-coldgrid}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-coldgrid_dev}
+      - POSTGRES_DB=${POSTGRES_DB:-coldgrid}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coldgrid"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: coldgrid-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: coldgrid-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  pgdata:

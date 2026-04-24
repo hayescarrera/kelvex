@@ -1,0 +1,33 @@
+[Unit]
+Description=ColdGrid Edge Agent — Compressor Monitoring
+Documentation=https://docs.coldgrid.io/edge-agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=coldgrid
+Group=coldgrid
+ExecStart=/usr/local/bin/coldgrid-agent -config /etc/coldgrid/agent.yaml
+Restart=always
+RestartSec=5
+WatchdogSec=120
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=coldgrid-agent
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/coldgrid
+ReadOnlyPaths=/etc/coldgrid
+
+# Resource limits
+MemoryMax=256M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
