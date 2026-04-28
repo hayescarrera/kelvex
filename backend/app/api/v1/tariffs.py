@@ -30,6 +30,39 @@ from app.schemas.tariff import (
 router = APIRouter(prefix="/tariffs", tags=["tariffs"])
 
 
+# ── Helpers ──────────────────────────────────────
+
+async def _get_schedule_for_mutation(
+    schedule_id: UUID, user: User, db: AsyncSession
+) -> RateSchedule:
+    """
+    Fetch a rate schedule and reject the request if a different org's facility
+    already uses it. Rate schedules are shared reference data, so we can't
+    org-scope them at the row level — this is the interim protection until we
+    add a created_by_org_id column via migration.
+    """
+    result = await db.execute(select(RateSchedule).where(RateSchedule.id == schedule_id))
+    schedule = result.scalar_one_or_none()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Rate schedule not found")
+
+    other_org = (await db.execute(
+        select(Facility.org_id).where(
+            Facility.rate_schedule_id == schedule_id,
+            Facility.org_id != user.org_id,
+            Facility.deleted_at == None,
+        ).limit(1)
+    )).scalar_one_or_none()
+
+    if other_org:
+        raise HTTPException(
+            status_code=403,
+            detail="Rate schedule is assigned to another organization's facility",
+        )
+
+    return schedule
+
+
 # ── Utilities ────────────────────────────────────
 
 @router.post("/utilities", response_model=UtilityResponse, status_code=status.HTTP_201_CREATED)
@@ -130,10 +163,7 @@ async def update_rate_schedule(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a rate schedule."""
-    result = await db.execute(select(RateSchedule).where(RateSchedule.id == schedule_id))
-    schedule = result.scalar_one_or_none()
-    if not schedule:
-        raise HTTPException(status_code=404, detail="Rate schedule not found")
+    schedule = await _get_schedule_for_mutation(schedule_id, current_user, db)
 
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(schedule, field, value)
@@ -150,11 +180,7 @@ async def delete_rate_schedule(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a rate schedule."""
-    result = await db.execute(select(RateSchedule).where(RateSchedule.id == schedule_id))
-    schedule = result.scalar_one_or_none()
-    if not schedule:
-        raise HTTPException(status_code=404, detail="Rate schedule not found")
-
+    schedule = await _get_schedule_for_mutation(schedule_id, current_user, db)
     await db.delete(schedule)
     await db.commit()
 
