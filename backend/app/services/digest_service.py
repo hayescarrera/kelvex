@@ -54,7 +54,7 @@ async def build_digest_html(db: AsyncSession, org_id: UUID, hours: int = 24) -> 
 
     if not fac_ids:
         return (
-            f"ColdGrid Digest — {period}",
+            f"Kelvex Digest — {period}",
             "<p>No facilities configured.</p>",
         )
 
@@ -149,14 +149,14 @@ async def build_digest_html(db: AsyncSession, org_id: UUID, hours: int = 24) -> 
                 <td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:600;">{count}</td>
             </tr>"""
 
-    subject = f"ColdGrid Digest — {period}"
+    subject = f"Kelvex Digest — {period}"
     if alert_counts["critical"] > 0:
-        subject = f"⚠ ColdGrid Digest — {alert_counts['critical']} Critical Alert{'s' if alert_counts['critical'] > 1 else ''}"
+        subject = f"⚠ Kelvex Digest — {alert_counts['critical']} Critical Alert{'s' if alert_counts['critical'] > 1 else ''}"
 
     html = f"""
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;color:#1a1a1a;">
-        <div style="background:#0e82c8;padding:20px 24px;border-radius:8px 8px 0 0;">
-            <h1 style="color:#fff;margin:0;font-size:20px;">❄ ColdGrid Digest</h1>
+        <div style="background:#0d9488;padding:20px 24px;border-radius:8px 8px 0 0;">
+            <h1 style="color:#fff;margin:0;font-size:20px;">❄ Kelvex Digest</h1>
             <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:13px;">
                 {period} • {len(facilities)} Facilit{'y' if len(facilities) == 1 else 'ies'}
             </p>

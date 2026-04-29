@@ -67,5 +67,5 @@ class NotificationLogListResponse(BaseModel):
 
 
 class NotificationTestRequest(BaseModel):
-    subject: str = "ColdGrid Test Notification"
-    body: str = "This is a test notification from ColdGrid. If you received this, your channel is configured correctly."
+    subject: str = "Kelvex Test Notification"
+    body: str = "This is a test notification from Kelvex. If you received this, your channel is configured correctly."

@@ -5,7 +5,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "ColdGrid"
+    APP_NAME: str = "Kelvex"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     LOG_LEVEL: str = "INFO"
@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM: str = "alerts@coldgrid.io"
+    SMTP_FROM: str = "alerts@kelvex.io"
     SMTP_TLS: bool = True
 
     # SMS (Twilio)

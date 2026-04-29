@@ -164,7 +164,7 @@ app = FastAPI(
 if settings.SECRET_KEY == "dev-secret-key-change-in-production":
     import warnings
     warnings.warn(
-        "ColdGrid is running with the default SECRET_KEY. "
+        "Kelvex is running with the default SECRET_KEY. "
         "Set a strong SECRET_KEY environment variable before deploying to production.",
         UserWarning,
         stacklevel=1,
@@ -313,7 +313,7 @@ async def request_context_headers(request: Request, call_next):
     request.state.request_id = request_id
     response = await call_next(request)
     response.headers["X-Request-Id"] = request_id
-    response.headers["X-ColdGrid-Version"] = app.version
+    response.headers["X-Kelvex-Version"] = app.version
     return response
 
 
@@ -357,7 +357,7 @@ async def health_check():
         status_code=status_code,
         content={
             "status": status_text,
-            "service": "coldgrid-api",
+            "service": "kelvex-api",
             "checks": {
                 "database": "healthy" if db_ok else "unhealthy",
                 "redis": "healthy" if redis_ok else "unhealthy",
