@@ -53,7 +53,7 @@ async def seed_demo_data(db: AsyncSession):
     now = datetime.now(timezone.utc)
 
     # ── Organization & User ─────────────────────
-    org = Organization(id=DEMO_ORG_ID, name="Kelvex Demo", slug="frigor-demo")
+    org = Organization(id=DEMO_ORG_ID, name="Kelvex Demo", slug="kelvex-demo")
     db.add(org)
     await db.flush()
 
