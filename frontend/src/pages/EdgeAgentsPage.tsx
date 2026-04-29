@@ -852,7 +852,7 @@ function ConfigDownload({ facilityId, agentId, onClose }: {
   // Generate YAML-like config for the edge agent
   const yamlConfig = `# Kelvex Edge Agent Configuration
 # Generated: ${new Date().toISOString()}
-# Drop this file at /etc/coldgrid/agent.yaml on your gateway device
+# Drop this file at /etc/kelvex/agent.yaml on your gateway device
 
 agent:
   name: "${config.agent_name}"
@@ -887,7 +887,7 @@ ${Object.entries(d.registers).map(([key, val]: [string, any]) =>
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `coldgrid-agent-${config.agent_name.toLowerCase().replace(/\s+/g, '-')}.yaml`
+    a.download = `kelvex-agent-${config.agent_name.toLowerCase().replace(/\s+/g, '-')}.yaml`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -916,8 +916,8 @@ ${Object.entries(d.registers).map(([key, val]: [string, any]) =>
         </button>
       </div>
       <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', margin: '8px 0 0' }}>
-        Place this file at <code>/etc/coldgrid/agent.yaml</code> on your gateway and run
-        <code style={{ marginLeft: 4 }}>coldgrid-agent start</code>
+        Place this file at <code>/etc/kelvex/agent.yaml</code> on your gateway and run
+        <code style={{ marginLeft: 4 }}>kelvex-agent start</code>
       </p>
     </div>
   )
