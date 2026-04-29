@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -53,8 +53,19 @@ def _can_manage_role(actor_role: str, target_role: str) -> bool:
 # ── Public endpoints ─────────────────────────────
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
+async def register(
+    data: UserRegister,
+    db: AsyncSession = Depends(get_db),
+    invite: str | None = Query(None, description="Invite token — required when REGISTRATION_OPEN=false"),
+):
     """Register a new user and organization."""
+    if not settings.REGISTRATION_OPEN:
+        if not invite or invite != settings.INVITE_SECRET:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Registration is by invitation only. Contact ben@kelvex.io to request access.",
+            )
+
     data.email = data.email.lower()
     result = await db.execute(select(User).where(User.email == data.email))
     if result.scalar_one_or_none():

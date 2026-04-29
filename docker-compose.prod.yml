@@ -1,0 +1,118 @@
+services:
+
+  # ── Database ────────────────────────────────────────────────────────────
+  db:
+    image: timescale/timescaledb:latest-pg16
+    restart: always
+    environment:
+      POSTGRES_DB: kelvex
+      POSTGRES_USER: kelvex
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kelvex"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes --appendfsync everysec
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── Backend ──────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kelvex:${POSTGRES_PASSWORD}@db:5432/kelvex
+      DATABASE_URL_SYNC: postgresql://kelvex:${POSTGRES_PASSWORD}@db:5432/kelvex
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      OPENEI_API_KEY: ${OPENEI_API_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      # Tighten rate limits in prod
+      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-5}
+      API_RATE_LIMIT_PER_MINUTE: ${API_RATE_LIMIT_PER_MINUTE:-100}
+      # Invite-only registration
+      REGISTRATION_OPEN: "false"
+      INVITE_SECRET: ${INVITE_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8000"
+    command: >
+      gunicorn app.main:app
+        --worker-class uvicorn.workers.UvicornWorker
+        --workers 4
+        --bind 0.0.0.0:8000
+        --timeout 120
+        --graceful-timeout 30
+        --keep-alive 5
+        --access-logfile -
+        --error-logfile -
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Frontend ─────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    expose:
+      - "80"
+    depends_on:
+      - backend
+
+  # ── Nginx reverse proxy ──────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_conf:/etc/letsencrypt:ro
+    depends_on:
+      - frontend
+      - backend
+
+  # ── Certbot (SSL) ────────────────────────────────────────────────────────
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+    # Run manually: docker compose run certbot certonly --webroot ...
+    profiles: ["certbot"]
+
+volumes:
+  pg_data:
+  redis_data:
+  certbot_www:
+  certbot_conf:

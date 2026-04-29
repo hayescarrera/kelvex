@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ALGORITHM: str = "HS256"
 
+    # Registration gate — set REGISTRATION_OPEN=false + INVITE_SECRET in production
+    REGISTRATION_OPEN: bool = True
+    INVITE_SECRET: str = ""
+
     # OpenEI
     OPENEI_API_KEY: str = ""
     OPENEI_BASE_URL: str = "https://api.openei.org/utility_rates"
