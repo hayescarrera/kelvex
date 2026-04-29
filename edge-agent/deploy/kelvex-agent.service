@@ -1,0 +1,33 @@
+[Unit]
+Description=Kelvex Edge Agent — Compressor Monitoring
+Documentation=https://docs.kelvex.io/edge-agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kelvex
+Group=kelvex
+ExecStart=/usr/local/bin/kelvex-agent -config /etc/kelvex/agent.yaml
+Restart=always
+RestartSec=5
+WatchdogSec=120
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kelvex-agent
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/kelvex
+ReadOnlyPaths=/etc/kelvex
+
+# Resource limits
+MemoryMax=256M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

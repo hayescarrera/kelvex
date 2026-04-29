@@ -30,12 +30,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/coldgrid/edge-agent/internal/config"
-	"github.com/coldgrid/edge-agent/internal/modbus"
-	"github.com/coldgrid/edge-agent/internal/platform"
-	"github.com/coldgrid/edge-agent/internal/scanner"
-	"github.com/coldgrid/edge-agent/internal/storage"
-	"github.com/coldgrid/edge-agent/internal/web"
+	"github.com/kelvex/edge-agent/internal/config"
+	"github.com/kelvex/edge-agent/internal/modbus"
+	"github.com/kelvex/edge-agent/internal/platform"
+	"github.com/kelvex/edge-agent/internal/scanner"
+	"github.com/kelvex/edge-agent/internal/storage"
+	"github.com/kelvex/edge-agent/internal/web"
 )
 
 var (

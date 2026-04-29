@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coldgrid/edge-agent/internal/config"
-	"github.com/coldgrid/edge-agent/internal/modbus"
-	"github.com/coldgrid/edge-agent/internal/storage"
+	"github.com/kelvex/edge-agent/internal/config"
+	"github.com/kelvex/edge-agent/internal/modbus"
+	"github.com/kelvex/edge-agent/internal/storage"
 )
 
 // LiveData holds the latest readings from all devices.

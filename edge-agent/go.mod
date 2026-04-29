@@ -1,4 +1,4 @@
-module github.com/coldgrid/edge-agent
+module github.com/kelvex/edge-agent
 
 go 1.22
 

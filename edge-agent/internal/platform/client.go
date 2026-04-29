@@ -14,8 +14,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/coldgrid/edge-agent/internal/modbus"
-	"github.com/coldgrid/edge-agent/internal/scanner"
+	"github.com/kelvex/edge-agent/internal/modbus"
+	"github.com/kelvex/edge-agent/internal/scanner"
 )
 
 type Client struct {

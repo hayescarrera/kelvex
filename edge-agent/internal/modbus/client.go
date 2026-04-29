@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coldgrid/edge-agent/internal/config"
+	"github.com/kelvex/edge-agent/internal/config"
 )
 
 // Reading represents a single poll cycle's worth of data from one device.

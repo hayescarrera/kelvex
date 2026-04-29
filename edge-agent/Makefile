@@ -1,4 +1,4 @@
-# ColdGrid Edge Agent — Build System
+# Kelvex Edge Agent — Build System
 #
 # Targets:
 #   make build          Build for current platform
@@ -10,8 +10,8 @@
 #   make test            Run tests
 #   make install         Install to /usr/local/bin
 
-BINARY     := coldgrid-agent
-MODULE     := github.com/coldgrid/edge-agent
+BINARY     := kelvex-agent
+MODULE     := github.com/kelvex/edge-agent
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
@@ -28,36 +28,36 @@ BUILD_DIR := build
 build:
 	@echo "Building $(BINARY) $(VERSION) for $$(go env GOOS)/$$(go env GOARCH)..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=1 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/coldgrid-agent
+	CGO_ENABLED=1 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/kelvex-agent
 
 build-arm:
 	@echo "Cross-compiling $(BINARY) $(VERSION) for linux/arm64..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc \
 		GOOS=linux GOARCH=arm64 \
-		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-arm64 ./cmd/coldgrid-agent
+		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-arm64 ./cmd/kelvex-agent
 
 build-arm7:
 	@echo "Cross-compiling $(BINARY) $(VERSION) for linux/arm (v7)..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=1 CC=arm-linux-gnueabihf-gcc \
 		GOOS=linux GOARCH=arm GOARM=7 \
-		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-armv7 ./cmd/coldgrid-agent
+		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-armv7 ./cmd/kelvex-agent
 
 build-amd64:
 	@echo "Building $(BINARY) $(VERSION) for linux/amd64..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-amd64 ./cmd/coldgrid-agent
+		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY)-linux-amd64 ./cmd/kelvex-agent
 
 build-all: build-amd64 build-arm build-arm7
 	@echo "All builds complete."
 	@ls -lh $(BUILD_DIR)/
 
 docker:
-	docker build --platform linux/arm64 -t coldgrid/edge-agent:$(VERSION) .
-	docker tag coldgrid/edge-agent:$(VERSION) coldgrid/edge-agent:latest
-	@echo "Docker image built: coldgrid/edge-agent:$(VERSION)"
+	docker build --platform linux/arm64 -t kelvex/edge-agent:$(VERSION) .
+	docker tag kelvex/edge-agent:$(VERSION) kelvex/edge-agent:latest
+	@echo "Docker image built: kelvex/edge-agent:$(VERSION)"
 
 test:
 	go test -v ./...
@@ -78,7 +78,7 @@ agent:
   key: "ag_abc123def456"
 
 platform:
-  url: "https://app.coldgrid.io"
+  url: "https://app.kelvex.io"
   heartbeat_interval_sec: 30
 
 devices:
@@ -150,7 +150,7 @@ devices:
 local:
   web_port: 8080
   web_enabled: true
-  buffer_path: "/var/lib/coldgrid/buffer.db"
+  buffer_path: "/var/lib/kelvex/buffer.db"
   buffer_max_mb: 500
   scan_subnet: "192.168.1.0/24"
 EOF

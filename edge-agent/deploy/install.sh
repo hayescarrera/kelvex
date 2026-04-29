@@ -1,21 +1,21 @@
 #!/bin/bash
-# ColdGrid Edge Agent — Quick Install Script
+# Kelvex Edge Agent — Quick Install Script
 #
 # Run on the gateway device (Raspberry Pi, Intel NUC, etc.):
-#   curl -sL https://install.coldgrid.io/agent | bash
+#   curl -sL https://releases.kelvex.io/agent/latest/install.sh | sudo bash
 #
 # Or manually:
 #   chmod +x install.sh && sudo ./install.sh
 
 set -euo pipefail
 
-BINARY_URL="${COLDGRID_BINARY_URL:-https://releases.coldgrid.io/agent/latest/coldgrid-agent-linux-$(dpkg --print-architecture)}"
+BINARY_URL="${KELVEX_BINARY_URL:-https://releases.kelvex.io/agent/latest/kelvex-agent-linux-$(dpkg --print-architecture)}"
 INSTALL_DIR="/usr/local/bin"
-CONFIG_DIR="/etc/coldgrid"
-DATA_DIR="/var/lib/coldgrid"
+CONFIG_DIR="/etc/kelvex"
+DATA_DIR="/var/lib/kelvex"
 
 echo "╔══════════════════════════════════════════╗"
-echo "║    ColdGrid Edge Agent — Installer       ║"
+echo "║     Kelvex Edge Agent — Installer        ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
@@ -26,55 +26,55 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Create user
-if ! id -u coldgrid &>/dev/null; then
-  echo "→ Creating coldgrid user..."
-  useradd -r -s /bin/false -d /var/lib/coldgrid coldgrid
+if ! id -u kelvex &>/dev/null; then
+  echo "→ Creating kelvex user..."
+  useradd -r -s /bin/false -d /var/lib/kelvex kelvex
 fi
 
 # Create directories
 echo "→ Creating directories..."
 mkdir -p "$CONFIG_DIR" "$DATA_DIR"
-chown coldgrid:coldgrid "$DATA_DIR"
+chown kelvex:kelvex "$DATA_DIR"
 
 # Download binary
 echo "→ Downloading agent binary..."
 if command -v curl &>/dev/null; then
-  curl -sL "$BINARY_URL" -o "$INSTALL_DIR/coldgrid-agent"
+  curl -sL "$BINARY_URL" -o "$INSTALL_DIR/kelvex-agent"
 elif command -v wget &>/dev/null; then
-  wget -q "$BINARY_URL" -O "$INSTALL_DIR/coldgrid-agent"
+  wget -q "$BINARY_URL" -O "$INSTALL_DIR/kelvex-agent"
 else
   echo "ERROR: curl or wget required"
   exit 1
 fi
-chmod +x "$INSTALL_DIR/coldgrid-agent"
+chmod +x "$INSTALL_DIR/kelvex-agent"
 
 # Verify
 echo "→ Verifying binary..."
-"$INSTALL_DIR/coldgrid-agent" -version
+"$INSTALL_DIR/kelvex-agent" -version
 
 # Install systemd service
 echo "→ Installing systemd service..."
-cat > /etc/systemd/system/coldgrid-agent.service <<'EOF'
+cat > /etc/systemd/system/kelvex-agent.service <<'EOF'
 [Unit]
-Description=ColdGrid Edge Agent — Compressor Monitoring
+Description=Kelvex Edge Agent — Compressor Monitoring
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=coldgrid
-Group=coldgrid
-ExecStart=/usr/local/bin/coldgrid-agent -config /etc/coldgrid/agent.yaml
+User=kelvex
+Group=kelvex
+ExecStart=/usr/local/bin/kelvex-agent -config /etc/kelvex/agent.yaml
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=coldgrid-agent
+SyslogIdentifier=kelvex-agent
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/lib/coldgrid
-ReadOnlyPaths=/etc/coldgrid
+ReadWritePaths=/var/lib/kelvex
+ReadOnlyPaths=/etc/kelvex
 MemoryMax=256M
 
 [Install]
@@ -93,21 +93,21 @@ if [ ! -f "$CONFIG_DIR/agent.yaml" ]; then
   echo "  Open http://$(hostname -I | awk '{print $1}'):8080"
   echo "  in your browser to configure."
   echo ""
-  echo "  Or download your config from the ColdGrid"
+  echo "  Or download your config from the Kelvex"
   echo "  platform and copy it to $CONFIG_DIR/agent.yaml"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 fi
 
 # Start
-echo "→ Starting coldgrid-agent..."
-systemctl enable coldgrid-agent
-systemctl start coldgrid-agent
+echo "→ Starting kelvex-agent..."
+systemctl enable kelvex-agent
+systemctl start kelvex-agent
 
 echo ""
-echo "✓ ColdGrid Edge Agent installed and running!"
+echo "✓ Kelvex Edge Agent installed and running!"
 echo ""
 echo "  Dashboard:  http://$(hostname -I | awk '{print $1}'):8080"
-echo "  Logs:       journalctl -u coldgrid-agent -f"
+echo "  Logs:       journalctl -u kelvex-agent -f"
 echo "  Config:     $CONFIG_DIR/agent.yaml"
-echo "  Status:     systemctl status coldgrid-agent"
+echo "  Status:     systemctl status kelvex-agent"
 echo ""
