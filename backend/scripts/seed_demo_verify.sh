@@ -36,12 +36,20 @@ echo "Alerts: $ACOUNT"
 
 echo ""
 echo "── Check bills ──────────────────────────────"
-# Get first facility id
 FID=$(curl -sf "$BACKEND/api/v1/facilities" \
   -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['facilities'][0]['id'])")
 BCOUNT=$(curl -sf "$BACKEND/api/v1/facilities/$FID/bills" \
   -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('total',len(d.get('bills',[]))))")
 echo "Bills for first facility: $BCOUNT"
+[ "$BCOUNT" -ge 1 ] || { echo "FAIL: no bills — seed data may be incomplete"; exit 1; }
+
+echo ""
+echo "── Check compressors ────────────────────────"
+CCOUNT=$(curl -sf "$BACKEND/api/v1/facilities/$FID/compressors" \
+  -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('total',len(d.get('compressors',[]))))")
+echo "Compressors for first facility: $CCOUNT"
 
 echo ""
 echo "✓ Seed data looks good. Demo account is ready."
+echo "  Portfolio: ~\$548k/year energy spend across 2 facilities"
+echo "  Demo: demo@kelvex.io / demo123"

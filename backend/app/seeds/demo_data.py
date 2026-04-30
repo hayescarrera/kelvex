@@ -1,5 +1,5 @@
 """
-Demo data seed for Frigor sales demos.
+Demo data seed for Kelvex sales demos.
 
 Creates a realistic cold storage environment:
   - Demo user account (demo@kelvex.io / demo123)
@@ -19,7 +19,8 @@ Usage:
 import uuid
 import asyncio
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
+from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,6 +43,7 @@ async def seed_demo_data(db: AsyncSession):
         MaintenanceTask, ComplianceReport,
     )
     from app.models.telemetry import Telemetry
+    from app.models.billing import UtilityBill
     from app.core.security import get_password_hash
 
     # Check if already seeded
@@ -403,6 +405,55 @@ async def seed_demo_data(db: AsyncSession):
         )
         db.add(task)
 
+    # ── Utility Bills (12 months) ────────────────
+    # Chicago: 120,000 sqft distribution center, ComEd TOU rate
+    #   base peak ~430 kW, ~240,000 kWh/mo, demand rate $18/kW, energy $0.085/kWh
+    # Dallas: 85,000 sqft frozen warehouse, Oncor rate
+    #   base peak ~280 kW, ~145,000 kWh/mo, demand rate $14/kW, energy $0.095/kWh
+    chicago_bills = [
+        # (period_start, period_end, peak_kw, kwh, demand_$, energy_$)
+        (date(2025, 5, 1),  date(2025, 6, 1),  451, 252000, 8118,  21420),
+        (date(2025, 6, 1),  date(2025, 7, 1),  507, 276000, 9126,  23460),
+        (date(2025, 7, 1),  date(2025, 8, 1),  529, 288000, 9522,  24480),
+        (date(2025, 8, 1),  date(2025, 9, 1),  516, 283200, 9288,  24072),
+        (date(2025, 9, 1),  date(2025, 10, 1), 473, 264000, 8514,  22440),
+        (date(2025, 10, 1), date(2025, 11, 1), 430, 240000, 7740,  20400),
+        (date(2025, 11, 1), date(2025, 12, 1), 404, 228000, 7272,  19380),
+        (date(2025, 12, 1), date(2026, 1, 1),  391, 223200, 7038,  18972),
+        (date(2026, 1, 1),  date(2026, 2, 1),  396, 225600, 7128,  19176),
+        (date(2026, 2, 1),  date(2026, 3, 1),  387, 220800, 6966,  18768),
+        (date(2026, 3, 1),  date(2026, 4, 1),  408, 230400, 7344,  19584),
+        (date(2026, 4, 1),  date(2026, 5, 1),  421, 235200, 7578,  19992),
+    ]
+    dallas_bills = [
+        (date(2025, 5, 1),  date(2025, 6, 1),  308, 159500, 4312,  15153),
+        (date(2025, 6, 1),  date(2025, 7, 1),  336, 174000, 4704,  16530),
+        (date(2025, 7, 1),  date(2025, 8, 1),  350, 181250, 4900,  17219),
+        (date(2025, 8, 1),  date(2025, 9, 1),  342, 176900, 4788,  16806),
+        (date(2025, 9, 1),  date(2025, 10, 1), 322, 166750, 4508,  15841),
+        (date(2025, 10, 1), date(2025, 11, 1), 286, 148900, 4004,  14146),
+        (date(2025, 11, 1), date(2025, 12, 1), 261, 134850, 3654,  12811),
+        (date(2025, 12, 1), date(2026, 1, 1),  246, 127600, 3444,  12122),
+        (date(2026, 1, 1),  date(2026, 2, 1),  247, 127600, 3458,  12122),
+        (date(2026, 2, 1),  date(2026, 3, 1),  252, 130500, 3528,  12398),
+        (date(2026, 3, 1),  date(2026, 4, 1),  266, 137750, 3724,  13086),
+        (date(2026, 4, 1),  date(2026, 5, 1),  280, 145000, 3920,  13775),
+    ]
+    for fac_id, rows in ((FAC_CHICAGO_ID, chicago_bills), (FAC_DALLAS_ID, dallas_bills)):
+        for (ps, pe, peak_kw, kwh, demand_c, energy_c) in rows:
+            bill = UtilityBill(
+                facility_id=fac_id,
+                period_start=ps,
+                period_end=pe,
+                peak_demand_kw=peak_kw,
+                total_kwh=kwh,
+                demand_charge=Decimal(str(demand_c)),
+                energy_charge=Decimal(str(energy_c)),
+                total_cost=Decimal(str(demand_c + energy_c)),
+                parsed_at=now,
+            )
+            db.add(bill)
+
     await db.commit()
     print("Demo data seeded successfully!")
     print("  Login: demo@kelvex.io / demo123")
@@ -412,6 +463,7 @@ async def seed_demo_data(db: AsyncSession):
     print("  Alerts: 5 (2 active, 1 acknowledged, 2 resolved)")
     print("  CCPs: 3, Compliance logs: 96, Excursions: 1 (resolved)")
     print("  Maintenance tasks: 5 (1 completed, 1 in progress, 2 scheduled, 1 overdue)")
+    print("  Utility bills: 24 months (Chicago: ~$348k/yr, Dallas: ~$201k/yr)")
 
 
 async def main():
