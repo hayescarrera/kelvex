@@ -25,10 +25,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Stable UUIDs for demo data
-DEMO_ORG_ID = uuid.UUID("d0000000-0000-0000-0000-000000000001")
-DEMO_USER_ID = uuid.UUID("d0000000-0000-0000-0000-000000000010")
+DEMO_ORG_ID   = uuid.UUID("d0000000-0000-0000-0000-000000000001")
+DEMO_USER_ID  = uuid.UUID("d0000000-0000-0000-0000-000000000010")
 FAC_CHICAGO_ID = uuid.UUID("d0000000-0000-0000-0000-000000000100")
-FAC_DALLAS_ID = uuid.UUID("d0000000-0000-0000-0000-000000000200")
+FAC_DALLAS_ID  = uuid.UUID("d0000000-0000-0000-0000-000000000200")
+# Chicago compressors
+COMP_A1_ID = uuid.UUID("d0000000-0000-0000-0000-000000000301")
+COMP_A2_ID = uuid.UUID("d0000000-0000-0000-0000-000000000302")
+COMP_B1_ID = uuid.UUID("d0000000-0000-0000-0000-000000000303")
+COMP_B2_ID = uuid.UUID("d0000000-0000-0000-0000-000000000304")
+# Dallas compressors
+COMP_D1_ID = uuid.UUID("d0000000-0000-0000-0000-000000000401")
+COMP_D2_ID = uuid.UUID("d0000000-0000-0000-0000-000000000402")
 
 
 async def seed_demo_data(db: AsyncSession):
@@ -172,19 +180,19 @@ async def seed_demo_data(db: AsyncSession):
 
     # ── Compressors (Chicago — 4 units) ─────────
     compressors_chi_data = [
-        {"name": "Comp-A1", "tag": "COMP-A1", "manufacturer": "Frick", "model": "RWF II 480",
+        {"id": COMP_A1_ID, "name": "Comp-A1", "tag": "COMP-A1", "manufacturer": "Frick", "model": "RWF II 480",
          "hp": 350, "capacity_tons": 280, "refrigerant": "NH3", "state": "running", "health_score": 94,
          "design_suction_psi": 28.0, "design_discharge_psi": 180.0},
 
-        {"name": "Comp-A2", "tag": "COMP-A2", "manufacturer": "Frick", "model": "RWF II 480",
+        {"id": COMP_A2_ID, "name": "Comp-A2", "tag": "COMP-A2", "manufacturer": "Frick", "model": "RWF II 480",
          "hp": 350, "capacity_tons": 280, "refrigerant": "NH3", "state": "running", "health_score": 87,
          "design_suction_psi": 28.0, "design_discharge_psi": 180.0},
 
-        {"name": "Comp-B1", "tag": "COMP-B1", "manufacturer": "Mycom", "model": "N8WB",
+        {"id": COMP_B1_ID, "name": "Comp-B1", "tag": "COMP-B1", "manufacturer": "Mycom", "model": "N8WB",
          "hp": 200, "capacity_tons": 160, "refrigerant": "NH3", "state": "running", "health_score": 91,
          "design_suction_psi": 25.0, "design_discharge_psi": 175.0},
 
-        {"name": "Comp-B2", "tag": "COMP-B2", "manufacturer": "Mycom", "model": "N8WB",
+        {"id": COMP_B2_ID, "name": "Comp-B2", "tag": "COMP-B2", "manufacturer": "Mycom", "model": "N8WB",
          "hp": 200, "capacity_tons": 160, "refrigerant": "NH3", "state": "idle", "health_score": 72,
          "design_suction_psi": 25.0, "design_discharge_psi": 175.0},
     ]
@@ -192,6 +200,7 @@ async def seed_demo_data(db: AsyncSession):
     comp_ids_chi = []
     for c in compressors_chi_data:
         comp = Compressor(
+            id=c["id"],
             facility_id=FAC_CHICAGO_ID,
             name=c["name"], tag=c["tag"],
             manufacturer=c["manufacturer"], model=c["model"],
@@ -213,15 +222,17 @@ async def seed_demo_data(db: AsyncSession):
 
     # ── Compressors (Dallas — 2 units) ──────────
     compressors_dal_data = [
-        {"name": "Comp-1", "tag": "COMP-1", "manufacturer": "Vilter", "model": "VSG 601",
+        {"id": COMP_D1_ID, "name": "Comp-1", "tag": "COMP-1", "manufacturer": "Vilter", "model": "VSG 601",
          "hp": 250, "capacity_tons": 200, "refrigerant": "NH3", "state": "running", "health_score": 96},
 
-        {"name": "Comp-2", "tag": "COMP-2", "manufacturer": "GEA", "model": "Grasso SP1",
+        {"id": COMP_D2_ID, "name": "Comp-2", "tag": "COMP-2", "manufacturer": "GEA", "model": "Grasso SP1",
          "hp": 150, "capacity_tons": 120, "refrigerant": "R-717", "state": "running", "health_score": 88},
     ]
 
+    comp_ids_dal = []
     for c in compressors_dal_data:
         comp = Compressor(
+            id=c["id"],
             facility_id=FAC_DALLAS_ID,
             name=c["name"], tag=c["tag"],
             manufacturer=c["manufacturer"], model=c["model"],
@@ -234,6 +245,8 @@ async def seed_demo_data(db: AsyncSession):
             last_reading_at=now - timedelta(minutes=random.randint(1, 3)),
         )
         db.add(comp)
+        await db.flush()
+        comp_ids_dal.append(comp.id)
 
     # ── Alerts ──────────────────────────────────
     # Some resolved, some active
@@ -273,6 +286,42 @@ async def seed_demo_data(db: AsyncSession):
             resolved_at=a.get("resolved_at"),
         )
         db.add(alert)
+
+    # ── Compressor Readings (last 24h, every 15 min) ────
+    # Per-compressor baselines with realistic variance
+    # comp_id: (discharge_psi, suction_psi, discharge_temp, oil_temp, amp, kw, vibration, slide_pct, rpm)
+    comp_profiles = {
+        COMP_A1_ID: dict(dp=170, sp=28, dt=185, ot=145, amp=220, kw=185, vib=0.12, sv=78, rpm=3560),
+        COMP_A2_ID: dict(dp=192, sp=29, dt=195, ot=155, amp=242, kw=203, vib=0.16, sv=88, rpm=3560),  # trending high
+        COMP_B1_ID: dict(dp=168, sp=26, dt=183, ot=142, amp=165, kw=138, vib=0.11, sv=75, rpm=3480),
+        COMP_B2_ID: dict(dp=166, sp=25, dt=180, ot=148, amp=160, kw=133, vib=0.22, sv=0, rpm=0),     # idle, vib issue
+        COMP_D1_ID: dict(dp=172, sp=28, dt=186, ot=143, amp=195, kw=164, vib=0.09, sv=82, rpm=3600),
+        COMP_D2_ID: dict(dp=165, sp=27, dt=182, ot=138, amp=120, kw=101, vib=0.10, sv=70, rpm=3420),
+    }
+    intervals = 96  # 24h at 15-min intervals
+    for comp_id, p in comp_profiles.items():
+        is_idle = (p["sv"] == 0)
+        for i in range(intervals, 0, -1):
+            t = now - timedelta(minutes=15 * i)
+            r = random.uniform
+            # Comp-A2 discharge pressure slowly rising over the 24h window
+            dp_drift = (96 - i) * 0.04 if comp_id == COMP_A2_ID else 0
+            reading = CompressorReading(
+                compressor_id=comp_id,
+                recorded_at=t,
+                discharge_pressure_psi=round(p["dp"] + dp_drift + r(-2, 2), 1),
+                suction_pressure_psi=round(p["sp"] + r(-0.5, 0.5), 1),
+                discharge_temp_f=round(p["dt"] + r(-3, 3), 1),
+                oil_temp_f=round(p["ot"] + r(-2, 2), 1),
+                amp_draw=round(p["amp"] + r(-5, 5), 1) if not is_idle else 0.0,
+                kw=round(p["kw"] + r(-4, 4), 1) if not is_idle else 0.0,
+                vibration_ips=round(p["vib"] + r(-0.01, 0.02), 3),
+                slide_valve_pct=round(p["sv"] + r(-2, 2), 1) if not is_idle else 0.0,
+                rpm=round(p["rpm"] + r(-10, 10)) if not is_idle else 0,
+                running=not is_idle,
+            )
+            db.add(reading)
+    await db.flush()
 
     # ── HACCP CCPs ──────────────────────────────
     ccp_data = [
@@ -463,7 +512,8 @@ async def seed_demo_data(db: AsyncSession):
     print("  Alerts: 5 (2 active, 1 acknowledged, 2 resolved)")
     print("  CCPs: 3, Compliance logs: 96, Excursions: 1 (resolved)")
     print("  Maintenance tasks: 5 (1 completed, 1 in progress, 2 scheduled, 1 overdue)")
-    print("  Utility bills: 24 months (Chicago: ~$348k/yr, Dallas: ~$201k/yr)")
+    print("  Compressor readings: 576 data points (6 compressors × 24h × 15-min intervals)")
+    print("  Utility bills: 24 bills (Chicago: ~$348k/yr, Dallas: ~$201k/yr)")
 
 
 async def main():
