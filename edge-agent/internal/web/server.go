@@ -275,7 +275,7 @@ var dashboardHTML = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ColdGrid Edge — Local Dashboard</title>
+<title>Kelvex Edge — Local Dashboard</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0e17; color: #e2e8f0; min-height: 100vh; }
@@ -325,7 +325,7 @@ var dashboardHTML = `<!DOCTYPE html>
 </head>
 <body>
 <div class="header">
-  <h1><span>❄</span> ColdGrid Edge — <span id="agent-name">Loading...</span></h1>
+  <h1><span>❄</span> Kelvex Edge — <span id="agent-name">Loading...</span></h1>
   <div>
     <span id="cloud-badge" class="cloud-badge offline">Cloud: Offline</span>
   </div>

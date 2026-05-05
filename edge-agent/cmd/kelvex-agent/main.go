@@ -1,11 +1,11 @@
-// ColdGrid Edge Agent — main entry point.
+// Kelvex Edge Agent — main entry point.
 //
 // This binary runs on a mini PC (Raspberry Pi, Intel NUC, etc.) installed
 // at each cold storage facility. It:
 //
 //  1. Connects to compressor controllers via Modbus TCP
 //  2. Polls telemetry (pressures, temps, vibration, amps, kW, etc.)
-//  3. Pushes data to the ColdGrid cloud platform
+//  3. Pushes data to the Kelvex cloud platform
 //  4. Buffers locally in SQLite when the cloud is unreachable
 //  5. Serves a local web dashboard for on-site operators
 //  6. Accepts control commands (setpoint changes, start/stop)
@@ -13,9 +13,9 @@
 //
 // Usage:
 //
-//	coldgrid-agent                          # uses /etc/coldgrid/agent.yaml
-//	coldgrid-agent -config /path/to/yaml    # custom config path
-//	coldgrid-agent -version                 # print version and exit
+//	kelvex-agent                          # uses /etc/kelvex/agent.yaml
+//	kelvex-agent -config /path/to/yaml    # custom config path
+//	kelvex-agent -version                 # print version and exit
 package main
 
 import (
@@ -45,12 +45,12 @@ var (
 )
 
 func main() {
-	configPath := flag.String("config", "/etc/coldgrid/agent.yaml", "path to config file")
+	configPath := flag.String("config", "/etc/kelvex/agent.yaml", "path to config file")
 	version := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
 	if *version {
-		fmt.Printf("coldgrid-agent %s (%s) built %s\n", Version, GitCommit, BuildTime)
+		fmt.Printf("kelvex-agent %s (%s) built %s\n", Version, GitCommit, BuildTime)
 		os.Exit(0)
 	}
 
@@ -60,7 +60,7 @@ func main() {
 	}))
 	slog.SetDefault(logger)
 
-	logger.Info("ColdGrid Edge Agent starting",
+	logger.Info("Kelvex Edge Agent starting",
 		"version", Version,
 		"go", runtime.Version(),
 		"os", runtime.GOOS,
