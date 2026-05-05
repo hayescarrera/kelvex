@@ -15,8 +15,8 @@ jobs:
         working-directory: backend
     env:
       SECRET_KEY: ci-test-secret-key-not-for-production
-      DATABASE_URL: sqlite+aiosqlite:///:memory:
-      REDIS_URL: ""
+      DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+      REDIS_URL: "redis://localhost:6379/0"
       ENVIRONMENT: test
       LOG_LEVEL: WARNING
       REGISTRATION_OPEN: "true"
