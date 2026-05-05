@@ -7,6 +7,7 @@ Cloud-facing endpoints (for the UI):
   GET    /facilities/{id}/agents/{agent_id}    — Get agent detail
   PATCH  /facilities/{id}/agents/{agent_id}    — Update agent config
   DELETE /facilities/{id}/agents/{agent_id}    — Decommission agent
+  GET    /facilities/{id}/agents/{aid}/config  — Download agent.yaml config
   POST   /facilities/{id}/agents/{aid}/scan    — Trigger network scan
   GET    /facilities/{id}/agents/{aid}/discoveries — Get discovered devices
   POST   /facilities/{id}/agents/{aid}/approve-discovery — Auto-create from discovery
@@ -166,6 +167,74 @@ async def decommission_agent(
     agent.enabled = False
     agent.connection_state = "disconnected"
     await db.flush()
+
+
+@router.get("/facilities/{facility_id}/agents/{agent_id}/config")
+async def get_agent_config(
+    facility_id: UUID,
+    agent_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Return a ready-to-deploy agent.yaml config for this agent.
+
+    The frontend uses this to generate a downloadable config file the
+    installer drops onto the gateway device at /etc/kelvex/agent.yaml.
+    """
+    from app.core.config import settings
+
+    await _get_facility(facility_id, current_user, db)
+    result = await db.execute(
+        select(EdgeAgent).where(EdgeAgent.id == agent_id, EdgeAgent.facility_id == facility_id)
+    )
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    devices_result = await db.execute(
+        select(AgentDevice, DeviceProfile)
+        .outerjoin(DeviceProfile, AgentDevice.profile_id == DeviceProfile.id)
+        .where(AgentDevice.agent_id == agent_id, AgentDevice.enabled == True)
+        .order_by(AgentDevice.created_at)
+    )
+    rows = devices_result.all()
+
+    devices = []
+    for device, profile in rows:
+        registers: dict = {}
+        if profile and profile.register_map:
+            registers.update(profile.register_map)
+        if device.register_overrides:
+            registers.update(device.register_overrides)
+
+        write_registers: dict = {}
+        if profile and profile.write_register_map:
+            write_registers.update(profile.write_register_map)
+
+        entry = {
+            "name": device.name,
+            "host": device.host,
+            "port": device.port,
+            "slave_id": device.slave_id,
+            "protocol": "modbus_tcp",
+            "poll_interval_sec": device.poll_interval_sec,
+            "compressor_id": str(device.compressor_id) if device.compressor_id else "",
+            "registers": registers,
+        }
+        if write_registers:
+            entry["write_registers"] = write_registers
+        devices.append(entry)
+
+    platform_url = getattr(settings, "PLATFORM_URL", None) or "https://app.kelvex.io"
+
+    return {
+        "agent_name": agent.name,
+        "agent_key": agent.agent_key,
+        "platform_url": platform_url,
+        "heartbeat_interval_sec": 30,
+        "devices": devices,
+    }
 
 
 # ── Agent-facing endpoints ─────────────────────────

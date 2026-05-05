@@ -255,8 +255,11 @@ func (s *Server) handleControl(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	// Serve the embedded single-page dashboard
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if s.CloudURL == "" {
+		w.Write([]byte(bootstrapHTML))
+		return
+	}
 	w.Write([]byte(dashboardHTML))
 }
 
@@ -267,6 +270,93 @@ func copyMap(m map[string]float64) map[string]float64 {
 	}
 	return out
 }
+
+// bootstrapHTML is shown when the agent has no config — guides the installer
+// to download agent.yaml from the Kelvex platform and drop it on this device.
+var bootstrapHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kelvex Edge — Setup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 2rem; max-width: 600px; width: 100%; margin: 1rem; }
+  h1 { font-size: 1.4rem; font-weight: 700; color: #f8fafc; margin-bottom: 0.25rem; }
+  .subtitle { color: #94a3b8; font-size: 0.9rem; margin-bottom: 2rem; }
+  .step { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+  .step-num { background: #6366f1; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+  .step-body h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; color: #f1f5f9; }
+  .step-body p { font-size: 0.85rem; color: #94a3b8; line-height: 1.5; }
+  code { background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.82rem; color: #a5f3fc; }
+  .cmd { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 0.6rem 0.8rem; margin-top: 0.5rem; font-size: 0.8rem; color: #a5f3fc; word-break: break-all; }
+  .platform-link { color: #818cf8; text-decoration: none; font-weight: 600; }
+  .platform-link:hover { text-decoration: underline; }
+  .status { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 0.6rem 0.8rem; margin-top: 1.5rem; font-size: 0.82rem; color: #64748b; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>❄ Kelvex Edge — Setup Required</h1>
+  <p class="subtitle">This agent is running but has no configuration. Follow the steps below.</p>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <h3>Log in to the Kelvex platform</h3>
+      <p>Go to <a href="https://app.kelvex.io" class="platform-link">app.kelvex.io</a>, open your facility, and navigate to <strong>Agents</strong>. Register this agent if you haven't already.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <h3>Download your agent.yaml config</h3>
+      <p>Click <strong>Download config</strong> next to your agent. This file contains your agent key and platform URL.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <h3>Copy the config to this device</h3>
+      <p>From your computer, copy the file to this gateway:</p>
+      <div class="cmd">scp agent.yaml pi@&lt;this-device-ip&gt;:/tmp/agent.yaml</div>
+      <p style="margin-top:0.5rem">Then on this device:</p>
+      <div class="cmd">sudo mv /tmp/agent.yaml /etc/kelvex/agent.yaml</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <h3>Restart the agent</h3>
+      <div class="cmd">sudo systemctl restart kelvex-agent</div>
+      <p style="margin-top:0.5rem">This page will reload automatically once the agent connects.</p>
+    </div>
+  </div>
+
+  <div class="status" id="status">Checking agent status...</div>
+</div>
+<script>
+  function check() {
+    fetch('/api/status').then(r => r.json()).then(d => {
+      const el = document.getElementById('status')
+      if (d.cloud_url) {
+        el.style.color = '#4ade80'
+        el.textContent = '✓ Agent configured — reloading...'
+        setTimeout(() => location.reload(), 1500)
+      } else {
+        el.textContent = 'Waiting for config at /etc/kelvex/agent.yaml...'
+      }
+    }).catch(() => {})
+  }
+  check()
+  setInterval(check, 5000)
+</script>
+</body>
+</html>`
 
 // dashboardHTML is the complete on-site dashboard — single HTML file with inline JS/CSS.
 // This runs locally on the gateway at port 8080.
