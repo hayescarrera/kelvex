@@ -1,0 +1,71 @@
+name: Edge Agent Release
+
+on:
+  push:
+    tags:
+      - 'agent-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build edge agent binaries
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: edge-agent/go.sum
+
+      - name: Install cross-compilers
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+
+      - name: Extract version
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#agent-}" >> $GITHUB_OUTPUT
+
+      - name: Build all targets
+        working-directory: edge-agent
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: make build-all
+
+      - name: Copy install script
+        working-directory: edge-agent
+        run: cp deploy/install.sh build/install.sh
+
+      - name: Create checksums
+        working-directory: edge-agent/build
+        run: sha256sum kelvex-agent-* install.sh > checksums.txt
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Edge Agent ${{ steps.ver.outputs.version }}
+          body: |
+            ## Kelvex Edge Agent ${{ steps.ver.outputs.version }}
+
+            ### Install (Linux — amd64 or ARM)
+            ```bash
+            curl -fsSL https://github.com/${{ github.repository }}/releases/latest/download/install.sh | sudo bash
+            ```
+
+            ### Manual download
+            | Platform | Binary |
+            |---|---|
+            | Linux amd64 (Intel/AMD) | `kelvex-agent-linux-amd64` |
+            | Linux arm64 (Raspberry Pi 4, 5) | `kelvex-agent-linux-arm64` |
+            | Linux armv7 (Raspberry Pi 3, older Pi) | `kelvex-agent-linux-armv7` |
+          files: |
+            edge-agent/build/kelvex-agent-linux-amd64
+            edge-agent/build/kelvex-agent-linux-arm64
+            edge-agent/build/kelvex-agent-linux-armv7
+            edge-agent/build/install.sh
+            edge-agent/deploy/kelvex-agent.service
+            edge-agent/build/checksums.txt

@@ -57,7 +57,7 @@ export default function DemandTab() {
                     demandFromAnalyses.length > 0 ? demandFromAnalyses : []
 
   return (
-    <div className="page-container">
+    <div>
       <div className="card">
         <div className="card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

@@ -215,15 +215,13 @@ export default function OnboardingPage() {
                       borderRadius: 6, fontSize: 12, overflow: 'auto',
                     }}>
 {`# Download and install the Kelvex agent
-curl -fsSL https://releases.kelvex.io/agent/latest/install.sh | sudo bash
+curl -fsSL https://github.com/hayescarrera/kelvex/releases/latest/download/install.sh | sudo bash
 
-# Configure with your API key
-kelvex-agent configure \\
-  --api-key ${agentToken} \\
-  --server https://app.kelvex.io
+# Edit /etc/kelvex/agent.yaml — set your agent key:
+#   key: ${agentToken}
 
 # Start the agent
-coldgrid-agent start`}
+sudo systemctl start kelvex-agent`}
                     </pre>
                   </div>
                 </div>

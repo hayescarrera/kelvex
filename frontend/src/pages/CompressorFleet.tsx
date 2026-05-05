@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import toast from 'react-hot-toast'
 import { useParams } from 'react-router-dom'
 import {
   Activity, Plus, X, Heart, AlertTriangle, Zap,
@@ -31,7 +30,7 @@ export default function CompressorFleet() {
   if (isLoading) return <LoadingState />
 
   return (
-    <div className="page-container">
+    <div>
       <PageHeader
         title="Compressor Fleet"
         subtitle={facility ? `${facility.name} — Refrigeration Plant` : 'Refrigeration Plant'}
@@ -137,10 +136,7 @@ function CompressorCard({ comp, facilityId, isSelected, onSelect }: {
           <span className={`badge badge-${comp.state === 'running' ? 'success' : comp.state === 'alarm' ? 'danger' : 'neutral'}`}>
             <span className="badge-dot" /> {comp.state}
           </span>
-          <button className="icon-btn-sm" title="Health check" onClick={e => { e.stopPropagation(); healthCheck.mutate(comp.compressor_id, {
-            onSuccess: () => toast.success('Health check triggered'),
-            onError: () => toast.error('Failed to trigger health check'),
-          }) }}>
+          <button className="icon-btn-sm" title="Health check" onClick={e => { e.stopPropagation(); healthCheck.mutate(comp.compressor_id) }}>
             <RefreshCw size={13} />
           </button>
         </div>
@@ -312,8 +308,7 @@ function AddCompressorModal({ facilityId, onClose }: { facilityId: string; onClo
       rack_name: form.rack_name || undefined,
       refrigerant_charge_lbs: form.refrigerant_charge_lbs ? parseFloat(form.refrigerant_charge_lbs) : undefined,
     }, {
-      onSuccess: () => { toast.success('Compressor updated'); onClose() },
-      onError: () => toast.error('Failed to add compressor'),
+      onSuccess: () => onClose(),
     })
   }
 

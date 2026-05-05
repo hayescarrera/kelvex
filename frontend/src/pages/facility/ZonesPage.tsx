@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import toast from 'react-hot-toast'
 import { useParams } from 'react-router-dom'
 import { Thermometer, Plus, X, Loader2, Trash2, Edit3 } from 'lucide-react'
 import LoadingState from '../../components/ui/LoadingState'
@@ -68,31 +67,18 @@ export default function ZonesPage() {
     if (editingZone) {
       updateZone.mutate(
         { zoneId: editingZone.id, data: form },
-        {
-          onSuccess: () => {
-            toast.success('Zone updated')
-            setShowModal(false)
-          },
-          onError: () => toast.error('Failed to update zone'),
-        },
+        { onSuccess: () => setShowModal(false) },
       )
     } else {
       createZone.mutate(form, {
-        onSuccess: () => {
-          toast.success('Zone created')
-          setShowModal(false)
-        },
-        onError: () => toast.error('Failed to create zone'),
+        onSuccess: () => setShowModal(false),
       })
     }
   }
 
   const handleDelete = (zone: Zone) => {
     if (!confirm(`Delete zone "${zone.name}"? This cannot be undone.`)) return
-    deleteZone.mutate(zone.id, {
-      onSuccess: () => toast.success('Zone deleted'),
-      onError: () => toast.error('Failed to delete zone'),
-    })
+    deleteZone.mutate(zone.id)
   }
 
   const setField = (key: keyof ZoneCreate, val: string | number | undefined) =>
@@ -132,21 +118,19 @@ export default function ZonesPage() {
 
           return (
             <div key={zone.id} className="zone-card" style={{ borderTopColor: color }}>
-              <div className="card-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+              <div className="zone-card-header">
                 <span className="cell-primary">{zone.name}</span>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <span className="chip" style={{ color }}>{zone.zone_type?.replace('_', ' ')}</span>
                   <button
-                    className="btn-ghost"
-                    style={{ padding: 4 }}
+                    className="icon-btn-sm"
                     onClick={() => openEdit(zone)}
                     title="Edit zone"
                   >
                     <Edit3 size={13} />
                   </button>
                   <button
-                    className="btn-ghost"
-                    style={{ padding: 4, color: 'var(--danger)' }}
+                    className="icon-btn-sm danger"
                     onClick={() => handleDelete(zone)}
                     title="Delete zone"
                   >
@@ -155,37 +139,35 @@ export default function ZonesPage() {
                 </div>
               </div>
 
-              <div style={{ padding: '0.5rem 1rem 1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '2.25rem', fontWeight: 700, color }}>
-                    {zone.current_temp != null ? zone.current_temp : '—'}
-                  </span>
-                  <span className="cell-secondary" style={{ fontSize: '1rem' }}>°{zone.temp_unit || 'F'}</span>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem', marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: '2.25rem', fontWeight: 700, color }}>
+                  {zone.current_temp != null ? zone.current_temp : '—'}
+                </span>
+                <span className="cell-secondary" style={{ fontSize: '1rem' }}>°{zone.temp_unit || 'F'}</span>
+              </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8125rem' }}>
-                  <div>
-                    <div className="text-muted">Setpoint</div>
-                    <div className="cell-primary">
-                      {zone.temp_setpoint != null ? `${zone.temp_setpoint}°${zone.temp_unit || 'F'}` : '—'}
-                    </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8125rem' }}>
+                <div>
+                  <div className="text-muted">Setpoint</div>
+                  <div className="cell-primary">
+                    {zone.temp_setpoint != null ? `${zone.temp_setpoint}°${zone.temp_unit || 'F'}` : '—'}
                   </div>
-                  <div>
-                    <div className="text-muted">Humidity</div>
-                    <div className="cell-primary">
-                      {zone.current_humidity != null ? `${zone.current_humidity}%` : '—'}
-                    </div>
+                </div>
+                <div>
+                  <div className="text-muted">Humidity</div>
+                  <div className="cell-primary">
+                    {zone.current_humidity != null ? `${zone.current_humidity}%` : '—'}
                   </div>
-                  <div>
-                    <div className="text-muted">Door</div>
-                    <div style={{ fontWeight: 600, color: isDoorOpen ? 'var(--danger)' : undefined }}>
-                      {isDoorOpen ? 'OPEN' : 'Closed'}
-                    </div>
+                </div>
+                <div>
+                  <div className="text-muted">Door</div>
+                  <div style={{ fontWeight: 600, color: isDoorOpen ? 'var(--danger)' : undefined }}>
+                    {isDoorOpen ? 'OPEN' : 'Closed'}
                   </div>
-                  <div>
-                    <div className="text-muted">State</div>
-                    <div className="cell-primary">{zone.state || 'normal'}</div>
-                  </div>
+                </div>
+                <div>
+                  <div className="text-muted">State</div>
+                  <div className="cell-primary">{zone.state || 'normal'}</div>
                 </div>
               </div>
             </div>

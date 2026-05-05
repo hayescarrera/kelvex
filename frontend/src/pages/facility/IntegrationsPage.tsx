@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import toast from 'react-hot-toast'
-import { Plus, Loader2, X, RefreshCw, Trash2, Wifi, WifiOff, TestTube } from 'lucide-react'
+import { Plus, X, RefreshCw, Trash2, Wifi, WifiOff, TestTube } from 'lucide-react'
+import LoadingState from '../../components/ui/LoadingState'
 import {
   useIntegrations, useProviders, useCreateIntegration,
   useTestIntegration, useDeleteIntegration, useTriggerPoll,
@@ -31,14 +31,8 @@ export default function IntegrationsPage() {
     try {
       const result = await testIntegration.mutateAsync(id)
       setTestResults(prev => ({ ...prev, [id]: result }))
-      if (result.success) {
-        toast.success('Connection test passed')
-      } else {
-        toast.error(`Connection test failed${result.error ? `: ${result.error}` : ''}`)
-      }
     } catch {
       setTestResults(prev => ({ ...prev, [id]: { success: false, error: 'Test failed' } }))
-      toast.error('Connection test failed')
     }
   }
 
@@ -46,7 +40,7 @@ export default function IntegrationsPage() {
     val ? new Date(val).toLocaleString() : '\u2014'
 
   return (
-    <div className="page-container stack-lg">
+    <div className="stack-lg">
       <div className="card">
         <div className="card-header">
           <h3>Integrations ({integrations.length})</h3>
@@ -57,7 +51,7 @@ export default function IntegrationsPage() {
 
         <div className="card-body" style={{ padding: 0 }}>
           {isLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Loader2 size={24} className="spin" /></div>
+            <LoadingState rows={3} />
           ) : integrations.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon"><Wifi size={24} /></div>
@@ -102,17 +96,11 @@ export default function IntegrationsPage() {
                         <button className="icon-btn-sm" title="Test connection" onClick={() => handleTest(integ.id)}>
                           <TestTube size={13} />
                         </button>
-                        <button className="icon-btn-sm" title="Poll now" onClick={() => triggerPoll.mutate(integ.id, {
-                          onSuccess: () => toast.success('Poll triggered'),
-                          onError: () => toast.error('Failed to trigger poll'),
-                        })}>
+                        <button className="icon-btn-sm" title="Poll now" onClick={() => triggerPoll.mutate(integ.id)}>
                           <RefreshCw size={13} />
                         </button>
                         <button className="icon-btn-sm danger" title="Delete" onClick={() => {
-                          if (confirm('Delete this integration?')) deleteIntegration.mutate(integ.id, {
-                            onSuccess: () => toast.success('Integration deleted'),
-                            onError: () => toast.error('Failed to delete integration'),
-                          })
+                          if (confirm('Delete this integration?')) deleteIntegration.mutate(integ.id)
                         }}>
                           <Trash2 size={13} />
                         </button>
@@ -169,8 +157,7 @@ function AddIntegrationModal({ facilityId, onClose }: { facilityId: string; onCl
       config: Object.keys(config).length > 0 ? config : undefined,
       enabled: true,
     }, {
-      onSuccess: () => { toast.success('Integration added'); onClose() },
-      onError: () => toast.error('Failed to add integration'),
+      onSuccess: () => onClose(),
     })
   }
 

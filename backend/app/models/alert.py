@@ -66,8 +66,8 @@ class Alert(Base):
     )
     resolution_note: Mapped[str] = mapped_column(Text, nullable=True)
     # Trigger data
-    trigger_value: Mapped[float] = mapped_column(nullable=True)  # the value that triggered it
-    threshold_value: Mapped[float] = mapped_column(nullable=True)  # the threshold that was breached
+    trigger_value: Mapped[str] = mapped_column(String(255), nullable=True)  # the value that triggered it
+    threshold_value: Mapped[str] = mapped_column(String(255), nullable=True)  # the threshold that was breached
     context: Mapped[dict] = mapped_column(JSONB, nullable=True, default=dict)
     # Timestamps
     triggered_at: Mapped[datetime] = mapped_column(

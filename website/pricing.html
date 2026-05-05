@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing — Kelvex</title>
+  <meta name="description" content="Kelvex pricing scales with your operation. Per facility, per month — no per-seat fees, no surprise charges." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────── -->
+<header class="nav nav-solid" id="nav">
+  <div class="nav-inner container">
+    <a href="/" class="nav-logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="7" fill="#0f172a"/>
+        <path d="M4 14L7.5 14L10 8L14 20L18 8L20.5 14L24 14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Kelvex
+    </a>
+    <nav class="nav-links">
+      <a href="/#platform">Platform</a>
+      <a href="/#how-it-works">How it works</a>
+      <a href="/#integrations">Integrations</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+    <div class="nav-actions">
+      <a href="https://app.kelvex.io" class="nav-signin">Sign in</a>
+      <a href="demo.html" class="nav-demo">Request demo</a>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Open menu">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="mobile-drawer" id="drawer">
+    <a href="/#platform">Platform</a>
+    <a href="/#how-it-works">How it works</a>
+    <a href="/#integrations">Integrations</a>
+    <a href="pricing.html">Pricing</a>
+    <hr/>
+    <a href="https://app.kelvex.io">Sign in</a>
+    <a href="demo.html" class="nav-demo drawer-demo">Request demo</a>
+  </div>
+</header>
+
+<!-- ── Page hero ─────────────────────────────────────────── -->
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Pricing</span>
+    <h1>Priced by facility, not by seat.</h1>
+    <p>One monthly fee per location. Your entire team gets access — no per-user charges, no usage caps, no hidden costs for alerts or reports.</p>
+  </div>
+</section>
+
+<!-- ── Pricing cards ─────────────────────────────────────── -->
+<section class="pricing-section">
+  <div class="container">
+    <div class="pricing-grid">
+
+      <!-- Essentials -->
+      <div class="pricing-card">
+        <div>
+          <div class="pricing-tier">Essentials</div>
+          <div class="pricing-price"><sup>$</sup>299</div>
+          <div class="pricing-price-sub">per facility / month</div>
+        </div>
+        <p class="pricing-desc">Full visibility and alerting for a single facility. Right for operators who want to stop flying blind before committing to a larger rollout.</p>
+        <ul class="pricing-features">
+          <li>Real-time compressor and zone monitoring</li>
+          <li>Configurable alerts via SMS and email</li>
+          <li>7-day data history</li>
+          <li>Temperature log export for compliance</li>
+          <li>Up to 5 team members</li>
+          <li>Standard onboarding support</li>
+        </ul>
+        <div class="pricing-cta">
+          <a href="demo.html" class="btn-secondary">Talk to us</a>
+        </div>
+      </div>
+
+      <!-- Professional -->
+      <div class="pricing-card featured">
+        <div class="pricing-badge">Most popular</div>
+        <div>
+          <div class="pricing-tier">Professional</div>
+          <div class="pricing-price"><sup>$</sup>599</div>
+          <div class="pricing-price-sub">per facility / month</div>
+        </div>
+        <p class="pricing-desc">Monitoring plus energy controls and full compliance reporting. Built for operators actively managing demand charges and audit requirements.</p>
+        <ul class="pricing-features">
+          <li>Everything in Essentials</li>
+          <li>Energy demand tracking and tariff analysis</li>
+          <li>Automated load controls and pre-cooling sequences</li>
+          <li>Full compliance reporting (FDA/USDA/HACCP)</li>
+          <li>90-day data history</li>
+          <li>Unlimited team members</li>
+          <li>Priority support</li>
+        </ul>
+        <div class="pricing-cta">
+          <a href="demo.html" class="btn-primary">Request a demo</a>
+        </div>
+      </div>
+
+      <!-- Portfolio -->
+      <div class="pricing-card">
+        <div>
+          <div class="pricing-tier">Portfolio</div>
+          <div class="pricing-price" style="font-size:28px; letter-spacing:-0.5px; padding-top:6px;">Custom</div>
+          <div class="pricing-price-sub">volume pricing for 6+ facilities</div>
+        </div>
+        <p class="pricing-desc">Significant per-facility discounts for larger operations, plus dedicated support, custom integrations, and multi-site fleet management.</p>
+        <ul class="pricing-features">
+          <li>Everything in Professional</li>
+          <li>Volume discount pricing</li>
+          <li>Custom equipment integrations</li>
+          <li>Dedicated account manager</li>
+          <li>SLA-backed uptime guarantee</li>
+          <li>Unlimited data history</li>
+          <li>API access for your internal systems</li>
+        </ul>
+        <div class="pricing-cta">
+          <a href="demo.html" class="btn-secondary">Contact us</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="pricing-faq">
+      <h2>Common questions</h2>
+      <div class="faq-grid">
+        <div class="faq-item">
+          <h3>What counts as a facility?</h3>
+          <p>A facility is a single physical location — a warehouse, distribution center, or production site. Multiple buildings on the same property under one management team typically count as one facility. We'll confirm this with you before you commit to anything.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Do I need to replace my existing equipment?</h3>
+          <p>No. Kelvex connects to your existing compressor controllers and sensors. If you have equipment we haven't integrated yet, we'll add it — that's been true for every customer we've onboarded so far.</p>
+        </div>
+        <div class="faq-item">
+          <h3>How long does it take to go live?</h3>
+          <p>Most customers are seeing live data within the same week of signing. We handle the connection setup and configuration — your team's involvement is minimal, and we don't require any contractors or new wiring.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Is there a contract or can I cancel anytime?</h3>
+          <p>We offer month-to-month and annual options. Annual billing comes with a meaningful discount. We don't lock you into multi-year terms, but in practice customers tend to stay once they've seen what they were missing.</p>
+        </div>
+        <div class="faq-item">
+          <h3>What does onboarding look like?</h3>
+          <p>We walk through your facilities with you, configure your controller connections, set your alert thresholds, and make sure your team knows how to use the dashboard. We don't hand you a PDF and disappear.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Can I start with one facility and expand later?</h3>
+          <p>Yes — and most customers do. You pay per facility, so adding a second or third site is straightforward. Portfolio pricing kicks in at six or more and is applied retroactively if you grow into it.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom CTA -->
+    <div style="text-align:center; padding: 72px 0 16px; border-top: 1px solid var(--border); margin-top: 64px;">
+      <h2 style="margin-bottom:14px;">Not sure which tier is right?</h2>
+      <p style="font-size:15px; color:var(--text-md); max-width:480px; margin:0 auto 28px; line-height:1.7;">Tell us about your operation and we'll point you in the right direction. Most customers know within the first conversation.</p>
+      <a href="demo.html" class="btn-primary btn-lg">Talk to us</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ────────────────────────────────────────────── -->
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a href="/" class="nav-logo" style="color:#0f172a;">
+        <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="7" fill="#0f172a"/>
+          <path d="M4 14L7.5 14L10 8L14 20L18 8L20.5 14L24 14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Kelvex
+      </a>
+      <p>The operating system for cold storage facilities.</p>
+    </div>
+    <div class="footer-cols">
+      <div class="footer-col">
+        <div class="footer-col-head">Product</div>
+        <a href="/#platform">Platform</a>
+        <a href="/#how-it-works">How it works</a>
+        <a href="/#integrations">Integrations</a>
+        <a href="pricing.html">Pricing</a>
+        <a href="https://app.kelvex.io">Dashboard</a>
+      </div>
+      <div class="footer-col">
+        <div class="footer-col-head">Company</div>
+        <a href="demo.html">Book a demo</a>
+        <a href="/#contact">Contact</a>
+        <a href="mailto:ben@kelvex.io?subject=Partnership">Partnerships</a>
+      </div>
+    </div>
+  </div>
+  <div class="container footer-bar">
+    <p>© 2025 Kelvex. All rights reserved.</p>
+    <p><a href="mailto:ben@kelvex.io">ben@kelvex.io</a></p>
+  </div>
+</footer>
+
+<script>
+const hamburger = document.getElementById('hamburger')
+const drawer = document.getElementById('drawer')
+hamburger.addEventListener('click', () => drawer.classList.toggle('open'))
+drawer.querySelectorAll('a').forEach(a => a.addEventListener('click', () => drawer.classList.remove('open')))
+</script>
+</body>
+</html>

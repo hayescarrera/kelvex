@@ -49,7 +49,7 @@ export default function AgentsPage() {
   }
 
   return (
-    <div className="page-container stack-lg">
+    <div className="stack-lg">
       <div className="card">
         <div className="card-header">
           <span>Register Agent</span>

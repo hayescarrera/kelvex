@@ -38,19 +38,24 @@ if settings.SENTRY_DSN:
     )
 
 
+_engine_status: dict[str, str] = {}  # engine_name → "running" | "failed" | "skipped"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle — start polling engine, seed data."""
     import logging
-    logger = logging.getLogger("coldgrid")
+    logger = logging.getLogger("kelvex")
 
     # Start polling engine for cloud integrations
     try:
         from app.core.database import async_session
         from app.services.polling_engine import start_polling_engine
         await start_polling_engine(async_session)
+        _engine_status["polling"] = "running"
         logger.info("Polling engine started")
     except Exception as e:
+        _engine_status["polling"] = "failed"
         logger.warning(f"Polling engine startup skipped: {e}")
 
     # Start schedule engine
@@ -58,8 +63,10 @@ async def lifespan(app: FastAPI):
         from app.core.database import async_session
         from app.services.schedule_engine import start_schedule_engine
         await start_schedule_engine(async_session)
+        _engine_status["schedule"] = "running"
         logger.info("Schedule engine started")
     except Exception as e:
+        _engine_status["schedule"] = "failed"
         logger.warning(f"Schedule engine startup skipped: {e}")
 
     # Start automation rule engine
@@ -67,8 +74,10 @@ async def lifespan(app: FastAPI):
         from app.core.database import async_session
         from app.services.rule_engine import start_rule_engine
         await start_rule_engine(async_session)
+        _engine_status["rule"] = "running"
         logger.info("Rule engine started")
     except Exception as e:
+        _engine_status["rule"] = "failed"
         logger.warning(f"Rule engine startup skipped: {e}")
 
     # Start email digest scheduler
@@ -76,8 +85,10 @@ async def lifespan(app: FastAPI):
         from app.core.database import async_session
         from app.services.digest_service import start_digest_scheduler
         await start_digest_scheduler(async_session)
+        _engine_status["digest"] = "running"
         logger.info("Digest scheduler started")
     except Exception as e:
+        _engine_status["digest"] = "failed"
         logger.warning(f"Digest scheduler startup skipped: {e}")
 
     # Start compressor health engine
@@ -85,8 +96,10 @@ async def lifespan(app: FastAPI):
         from app.core.database import async_session
         from app.services.compressor_health import start_compressor_health_engine
         await start_compressor_health_engine(async_session)
+        _engine_status["compressor_health"] = "running"
         logger.info("Compressor health engine started")
     except Exception as e:
+        _engine_status["compressor_health"] = "failed"
         logger.warning(f"Compressor health engine startup skipped: {e}")
 
     # Seed register maps and device profiles on first run
@@ -349,7 +362,8 @@ async def health_check():
     else:
         redis_ok = False
 
-    is_healthy = db_ok  # Redis is optional
+    engines_failed = [name for name, state in _engine_status.items() if state == "failed"]
+    is_healthy = db_ok  # Redis and engines are optional
     status_text = "healthy" if is_healthy else "degraded"
     status_code = 200 if is_healthy or not settings.HEALTHCHECK_STRICT else 503
 
@@ -361,6 +375,8 @@ async def health_check():
             "checks": {
                 "database": "healthy" if db_ok else "unhealthy",
                 "redis": "healthy" if redis_ok else "unhealthy",
+                "engines": _engine_status if _engine_status else "starting",
             },
+            **({"engines_failed": engines_failed} if engines_failed else {}),
         },
     )

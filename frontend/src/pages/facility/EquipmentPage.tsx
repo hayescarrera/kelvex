@@ -193,7 +193,7 @@ export default function EquipmentPage() {
                       <span className="cell-primary">{eq.name}</span>
                     </td>
                     <td>
-                      <span className="badge badge-info">{eq.type ?? '—'}</span>
+                      <span className="badge badge-info">{eq.equipment_type ?? '—'}</span>
                     </td>
                     <td>
                       <span className="cell-secondary">{eq.manufacturer ?? '—'}</span>

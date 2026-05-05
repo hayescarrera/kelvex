@@ -338,8 +338,21 @@ export default function FleetOverview() {
       {/* ── Facility Table ─────────────────────── */}
       <div className="content-area">
         {facilities.length === 0 ? (
-          <EmptyState icon={<Building2 size={28} />} title="No facilities yet" description="Add your first cold storage facility to start monitoring operations."
-            action={<button className="btn-ghost" onClick={() => setShowAddModal(true)}><Plus size={15} /> Add your first facility</button>} />
+          <EmptyState
+            icon={<Building2 size={28} />}
+            title="No facilities yet"
+            description="Add your first cold storage facility to start monitoring operations."
+            action={
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button className="btn-primary" onClick={() => navigate('/onboarding')} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <ChevronRight size={15} /> Start setup wizard
+                </button>
+                <button className="btn-ghost" onClick={() => setShowAddModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Plus size={15} /> Add manually
+                </button>
+              </div>
+            }
+          />
         ) : (
           <div className="card">
             <div className="card-header"><h3>Facilities</h3></div>

@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -68,6 +68,13 @@ function ProtectedLayout() {
   )
 }
 
+function RequireAuth() {
+  const { isAuthenticated } = useAuth()
+  const location = useLocation()
+  if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} replace />
+  return <ProtectedLayout />
+}
+
 function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
 
@@ -79,7 +86,7 @@ function AppRoutes() {
         path="/login"
         element={isAuthenticated ? <Navigate to="/" /> : <Login />}
       />
-      <Route element={isAuthenticated ? <ProtectedLayout /> : <Navigate to="/login" />}>
+      <Route element={<RequireAuth />}>
         {/* Dashboard */}
         <Route index element={<FleetOverview />} />
 

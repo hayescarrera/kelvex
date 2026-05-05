@@ -1,21 +1,72 @@
 import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
-import { Activity, DollarSign, ArrowRight, Eye, Cpu } from 'lucide-react'
+import { Activity, DollarSign, ArrowRight, Eye, Cpu, EyeOff } from 'lucide-react'
 import KelvexLogo from '../components/ui/KelvexLogo'
+
+function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
+  let score = 0
+  if (pw.length >= 8) score++
+  if (pw.length >= 12) score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+  if (score <= 1) return { score, label: 'Weak', color: '#f87171' }
+  if (score <= 2) return { score, label: 'Fair', color: '#fb923c' }
+  if (score <= 3) return { score, label: 'Good', color: '#facc15' }
+  return { score, label: 'Strong', color: '#34d399' }
+}
+
+function friendlyError(err: unknown): string {
+  if (!(err instanceof Error)) return 'Something went wrong. Please try again.'
+  const msg = err.message.toLowerCase()
+  if (msg.includes('incorrect') || msg.includes('invalid') || msg.includes('401'))
+    return 'Incorrect email or password.'
+  if (msg.includes('already') || msg.includes('exists') || msg.includes('409'))
+    return 'An account with that email already exists.'
+  if (msg.includes('422') || msg.includes('validation'))
+    return 'Please check your details and try again.'
+  if (msg.includes('network') || msg.includes('fetch'))
+    return 'Cannot reach the server. Check your connection.'
+  return err.message
+}
 
 export default function Login() {
   const { login } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/'
+
   const [isRegister, setIsRegister] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [fullName, setFullName] = useState('')
   const [orgName, setOrgName] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const strength = isRegister ? getPasswordStrength(password) : null
+
+  const validate = (): string | null => {
+    if (isRegister) {
+      if (!fullName.trim()) return 'Full name is required.'
+      if (!orgName.trim()) return 'Company name is required.'
+      if (password.length < 8) return 'Password must be at least 8 characters.'
+      if (password !== confirmPassword) return 'Passwords do not match.'
+    }
+    if (!email.includes('@')) return 'Enter a valid email address.'
+    if (!password) return 'Password is required.'
+    return null
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const validationError = validate()
+    if (validationError) { setError(validationError); return }
     setError('')
     setLoading(true)
     try {
@@ -25,12 +76,19 @@ export default function Login() {
       } else {
         tokens = await api.login(email, password)
       }
-      await login(tokens.access_token, tokens.refresh_token)
+      await login(tokens.access_token, tokens.refresh_token, rememberMe)
+      navigate(isRegister ? '/onboarding' : from, { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setError(friendlyError(err))
     } finally {
       setLoading(false)
     }
+  }
+
+  const switchMode = () => {
+    setIsRegister(r => !r)
+    setError('')
+    setConfirmPassword('')
   }
 
   return (
@@ -85,45 +143,127 @@ export default function Login() {
           <div style={styles.formHeader}>
             <h2 style={styles.formTitle}>{isRegister ? 'Create your account' : 'Welcome back'}</h2>
             <p style={styles.formSubtitle}>
-              {isRegister ? 'Start analyzing your demand charges in minutes' : 'Sign in to your Kelvex dashboard'}
+              {isRegister
+                ? 'Start monitoring your cold storage operations in minutes'
+                : 'Sign in to your Kelvex dashboard'}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} style={styles.form}>
+          <form onSubmit={handleSubmit} style={styles.form} noValidate>
             {isRegister && (
               <>
                 <div style={styles.fieldGroup}>
                   <label style={styles.label}>Full name</label>
-                  <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} style={styles.input} placeholder="Jane Smith" required />
+                  <input
+                    type="text" value={fullName} onChange={e => setFullName(e.target.value)}
+                    style={styles.input} placeholder="Jane Smith" autoComplete="name"
+                  />
                 </div>
                 <div style={styles.fieldGroup}>
                   <label style={styles.label}>Company</label>
-                  <input type="text" value={orgName} onChange={e => setOrgName(e.target.value)} style={styles.input} placeholder="Acme Cold Storage" required />
+                  <input
+                    type="text" value={orgName} onChange={e => setOrgName(e.target.value)}
+                    style={styles.input} placeholder="Acme Cold Storage" autoComplete="organization"
+                  />
                 </div>
               </>
             )}
+
             <div style={styles.fieldGroup}>
               <label style={styles.label}>Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={styles.input} placeholder="you@company.com" required />
+              <input
+                type="email" value={email} onChange={e => setEmail(e.target.value)}
+                style={styles.input} placeholder="you@company.com" autoComplete="email"
+              />
             </div>
+
             <div style={styles.fieldGroup}>
               <label style={styles.label}>Password</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={styles.input} placeholder={isRegister ? 'Create a password' : 'Enter your password'} required />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password} onChange={e => setPassword(e.target.value)}
+                  style={{ ...styles.input, paddingRight: 40 }}
+                  placeholder={isRegister ? 'Create a password (8+ chars)' : 'Enter your password'}
+                  autoComplete={isRegister ? 'new-password' : 'current-password'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(s => !s)}
+                  style={styles.eyeBtn}
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              {isRegister && password && strength && (
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ display: 'flex', gap: 3, marginBottom: 3 }}>
+                    {[1, 2, 3, 4].map(i => (
+                      <div key={i} style={{
+                        flex: 1, height: 3, borderRadius: 2,
+                        background: i <= strength.score ? strength.color : 'rgba(148,163,184,0.15)',
+                        transition: 'background 200ms',
+                      }} />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 11, color: strength.color }}>{strength.label}</span>
+                </div>
+              )}
             </div>
-            {error && (
-              <div style={styles.errorBox}><span style={styles.errorText}>{error}</span></div>
+
+            {isRegister && (
+              <div style={styles.fieldGroup}>
+                <label style={styles.label}>Confirm password</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                  style={{
+                    ...styles.input,
+                    borderColor: confirmPassword && confirmPassword !== password
+                      ? 'rgba(248,113,113,0.4)' : undefined,
+                  }}
+                  placeholder="Repeat your password"
+                  autoComplete="new-password"
+                />
+              </div>
             )}
+
+            {error && (
+              <div style={styles.errorBox}>
+                <span style={styles.errorText}>{error}</span>
+              </div>
+            )}
+
+            {!isRegister && (
+              <label style={styles.rememberRow}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  style={{ accentColor: '#38bdf8', width: 14, height: 14 }}
+                />
+                <span style={{ fontSize: 13, color: '#94a3b8' }}>Remember me</span>
+              </label>
+            )}
+
             <button type="submit" style={styles.submitBtn} disabled={loading}>
-              {loading ? <span style={styles.spinner} /> : <>{isRegister ? 'Get Started' : 'Sign In'}<ArrowRight size={16} /></>}
+              {loading
+                ? <span style={styles.spinner} />
+                : <>{isRegister ? 'Get Started' : 'Sign In'}<ArrowRight size={16} /></>}
             </button>
           </form>
 
           <div style={styles.divider}>
             <span style={styles.dividerLine} />
-            <span style={styles.dividerText}>{isRegister ? 'Already have an account?' : 'New to Kelvex?'}</span>
+            <span style={styles.dividerText}>
+              {isRegister ? 'Already have an account?' : 'New to Kelvex?'}
+            </span>
             <span style={styles.dividerLine} />
           </div>
-          <button onClick={() => { setIsRegister(!isRegister); setError('') }} style={styles.toggleBtn}>
+
+          <button onClick={switchMode} style={styles.toggleBtn}>
             {isRegister ? 'Sign in instead' : 'Create an account'}
           </button>
         </div>
@@ -169,15 +309,26 @@ const styles: Record<string, React.CSSProperties> = {
   formHeader: { marginBottom: 32 },
   formTitle: { fontSize: 22, fontWeight: 600, color: '#f1f5f9', marginBottom: 6, letterSpacing: '-0.01em' },
   formSubtitle: { fontSize: 14, color: '#64748b' },
-  form: { display: 'flex', flexDirection: 'column' as const, gap: 20 },
+  form: { display: 'flex', flexDirection: 'column' as const, gap: 18 },
   fieldGroup: { display: 'flex', flexDirection: 'column' as const, gap: 6 },
   label: { fontSize: 13, fontWeight: 500, color: '#94a3b8', letterSpacing: '0.01em' },
   input: {
     padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(148, 163, 184, 0.12)',
     background: 'rgba(15, 23, 42, 0.6)', color: '#f1f5f9', fontSize: 14, outline: 'none',
-    transition: 'border-color 200ms ease, box-shadow 200ms ease', width: '100%',
+    transition: 'border-color 200ms ease, box-shadow 200ms ease', width: '100%', boxSizing: 'border-box' as const,
   },
-  errorBox: { padding: '10px 14px', borderRadius: 8, background: 'rgba(248, 113, 113, 0.08)', border: '1px solid rgba(248, 113, 113, 0.15)' },
+  eyeBtn: {
+    position: 'absolute' as const, right: 10, top: '50%', transform: 'translateY(-50%)',
+    background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 2,
+    display: 'flex', alignItems: 'center',
+  },
+  rememberRow: {
+    display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' as const,
+  },
+  errorBox: {
+    padding: '10px 14px', borderRadius: 8,
+    background: 'rgba(248, 113, 113, 0.08)', border: '1px solid rgba(248, 113, 113, 0.15)',
+  },
   errorText: { color: '#f87171', fontSize: 13 },
   submitBtn: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 20px',

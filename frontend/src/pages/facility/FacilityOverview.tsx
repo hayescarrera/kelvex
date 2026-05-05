@@ -8,6 +8,7 @@ import { useFacility } from '../../hooks/useFacilities'
 import { useEquipment } from '../../hooks/useEquipment'
 import { useBills } from '../../hooks/useBills'
 import { useZones } from '../../hooks/useZones'
+import { useAlerts } from '../../hooks/useAlerts'
 import type { Equipment as EquipmentType, Zone } from '../../lib/api'
 
 export default function FacilityOverview() {
@@ -16,6 +17,7 @@ export default function FacilityOverview() {
   const { data: eqData, isLoading: el } = useEquipment(facilityId!)
   const { data: billData, isLoading: bl } = useBills(facilityId!)
   const { data: zoneData, isLoading: zl } = useZones(facilityId!)
+  const { data: alertData } = useAlerts(facilityId!, { state: 'active' })
 
   if (fl || el || bl || zl) return <LoadingState />
 
@@ -23,6 +25,7 @@ export default function FacilityOverview() {
   const bills = billData?.bills ?? []
   const zones = zoneData?.zones ?? []
   const latestBill = bills[0] ?? null
+  const activeAlerts = alertData?.total ?? 0
 
   // Build cost chart from real bills — most recent 7
   const costData = bills
@@ -55,7 +58,7 @@ export default function FacilityOverview() {
         <StatCard icon={<Cpu size={18} />} color="var(--accent)" value={String(equipment.length)} label="Equipment" />
         <StatCard icon={<Thermometer size={18} />} color="var(--success)" value={String(zones.length)} label="Zones" />
         <StatCard icon={<Activity size={18} />} color="var(--warning)" value={equipment.length > 0 ? `${equipment.length}/${equipment.length}` : '--'} label="Online" />
-        <StatCard icon={<AlertTriangle size={18} />} color="var(--danger)" value="0" label="Alerts" />
+        <StatCard icon={<AlertTriangle size={18} />} color="var(--danger)" value={String(activeAlerts)} label="Active Alerts" />
         <StatCard icon={<DollarSign size={18} />} color="#7c3aed" value={latestBill?.total_cost ? `$${Number(latestBill.total_cost).toLocaleString()}` : '--'} label="Last Bill" />
       </div>
 

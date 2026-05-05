@@ -250,15 +250,14 @@ def _score_parameter(
         if bl_std > 0:
             z_score = abs(current_avg - bl_mean) / bl_std
             stat_score = max(0.0, 100.0 - (z_score * 20.0))  # 5 sigma = 0
+            if z_score > 2.5:
+                direction = "above" if current_avg > bl_mean else "below"
+                anomalies.append(
+                    f"{label} {direction} baseline: {current_avg:.1f} {unit} "
+                    f"(baseline: {bl_mean:.1f} ± {bl_std:.1f})"
+                )
         else:
             stat_score = 100.0
-
-        if z_score > 2.5:
-            direction = "above" if current_avg > bl_mean else "below"
-            anomalies.append(
-                f"{label} {direction} baseline: {current_avg:.1f} {unit} "
-                f"(baseline: {bl_mean:.1f} ± {bl_std:.1f})"
-            )
     else:
         stat_score = 100.0
 
@@ -378,11 +377,13 @@ async def _create_health_alert(
     db: AsyncSession,
 ):
     """Create an alert when compressor health drops critically."""
-    # Check if there's already an active alert for this compressor
+    # Check if there's already an active alert for this compressor.
+    # trigger_value stores the compressor UUID as the stable dedup key.
     result = await db.execute(
         select(Alert).where(
-            Alert.equipment_id == comp.id,
+            Alert.facility_id == comp.facility_id,
             Alert.alert_type == "compressor_health",
+            Alert.trigger_value == str(comp.id),
             Alert.state == "active",
         )
     )
@@ -392,15 +393,15 @@ async def _create_health_alert(
 
     alert = Alert(
         facility_id=comp.facility_id,
-        equipment_id=comp.id,
+        equipment_id=None,  # Compressors are not in the equipment table
         severity="critical" if score < 25 else "high",
         category="equipment",
         alert_type="compressor_health",
         title=f"{comp.name} health critical: {score}/100",
         message=f"Compressor health score dropped to {score}/100. Anomalies: {'; '.join(anomalies[:5])}",
         state="active",
-        trigger_value=str(score),
+        trigger_value=str(comp.id),
         threshold_value="40",
-        context={"anomalies": anomalies, "health_score": score},
+        context={"compressor_id": str(comp.id), "anomalies": anomalies, "health_score": score},
     )
     db.add(alert)

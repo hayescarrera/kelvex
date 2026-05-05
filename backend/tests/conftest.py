@@ -31,6 +31,7 @@ from app.models.alert import Alert
 from app.models.control import ControlSequence, AutomationRule, Schedule, CommandQueue
 from app.models.integration import Integration, IntegrationCredential, RegisterMap
 from app.models.telemetry import Telemetry
+from app.models.compressor import Compressor, CompressorReading
 
 
 # ── SQLite compatibility: compile PG types for SQLite ──
@@ -143,7 +144,9 @@ PG_ARRAY.result_processor = _patched_array_result
 
 
 # ── Async SQLite engine for tests ─────────────────────
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# Use a named shared-cache memory database so all connections see the same data,
+# even when pytest-asyncio creates new event loops between fixtures and test bodies.
+TEST_DATABASE_URL = "sqlite+aiosqlite:///file:testdb?mode=memory&cache=shared&uri=true"
 
 test_engine = create_async_engine(
     TEST_DATABASE_URL,
@@ -230,6 +233,7 @@ async def user(org: Organization) -> User:
             hashed_password=get_password_hash("TestPass123!"),
             full_name="Test User",
             org_id=org.id,
+            role="owner",
             is_admin=True,
             is_active=True,
         )
@@ -367,6 +371,7 @@ async def other_user(other_org: Organization) -> User:
             hashed_password=get_password_hash("OtherPass123!"),
             full_name="Other User",
             org_id=other_org.id,
+            role="owner",
             is_admin=False,
             is_active=True,
         )
@@ -380,3 +385,28 @@ async def other_user(other_org: Organization) -> User:
 async def other_auth_headers(other_user: User) -> dict:
     token = create_access_token(data={"sub": str(other_user.id), "org": str(other_user.org_id)})
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest_asyncio.fixture
+async def compressor(facility: Facility) -> Compressor:
+    """Create a test compressor with alarm thresholds set."""
+    async with TestSessionLocal() as db:
+        c = Compressor(
+            id=uuid.uuid4(),
+            facility_id=facility.id,
+            name="Test Comp A1",
+            tag="COMP-A1",
+            manufacturer="Frick",
+            model="RWF II 480",
+            state="running",
+            alarm_discharge_psi_high=220.0,
+            alarm_suction_psi_low=10.0,
+            alarm_oil_temp_high=170.0,
+            alarm_bearing_temp_high=190.0,
+            alarm_vibration_high=0.28,
+            alarm_amp_draw_high=260.0,
+        )
+        db.add(c)
+        await db.commit()
+        await db.refresh(c)
+        return c

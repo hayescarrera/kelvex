@@ -30,7 +30,7 @@ from sqlalchemy import select, func, update
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.models.facility import Facility
+from app.models.facility import Facility, Equipment
 from app.models.agent import EdgeAgent, AgentLog
 from app.models.telemetry import Telemetry
 from app.models.compressor import Compressor, CompressorReading
@@ -223,8 +223,17 @@ async def ingest_telemetry(
     now = datetime.now(timezone.utc)
     inserted = 0
 
+    # Cache valid equipment IDs for this agent's facility to prevent cross-org writes
+    valid_equipment_result = await db.execute(
+        select(Equipment.id).where(Equipment.facility_id == agent.facility_id)
+    )
+    valid_equipment_ids = {str(row[0]) for row in valid_equipment_result.all()}
+
     for reading in data.readings:
         try:
+            eq_id = str(reading["equipment_id"])
+            if eq_id not in valid_equipment_ids:
+                continue  # silently drop — agent may have stale config
             t = Telemetry(
                 time=reading.get("time", now),
                 equipment_id=reading["equipment_id"],
@@ -398,10 +407,19 @@ async def ingest_compressor_readings(
     inserted = 0
     errors = []
 
+    # Load valid compressor IDs for this agent's facility to prevent cross-org writes
+    valid_compressors_result = await db.execute(
+        select(Compressor.id).where(Compressor.facility_id == agent.facility_id)
+    )
+    valid_compressor_ids = {str(row[0]) for row in valid_compressors_result.all()}
+
     readings = payload.get("readings", [])
     for r in readings:
         try:
             compressor_id = r["compressor_id"]
+            if str(compressor_id) not in valid_compressor_ids:
+                errors.append(f"compressor {compressor_id} not in agent facility")
+                continue
             values = r.get("values", {})
             ts = r.get("time", now)
             if isinstance(ts, str):

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import toast from 'react-hot-toast'
-import { Loader2, Play, Plus, X, Power, PowerOff } from 'lucide-react'
+import { Play, Plus, X, Power, PowerOff } from 'lucide-react'
+import LoadingState from '../../components/ui/LoadingState'
 import {
   useSequences, useCreateSequence, useRunSequence,
   useAutomationRules, useCreateAutomationRule, useUpdateAutomationRule,
@@ -31,17 +31,14 @@ export default function ControlsPage() {
 
   const toggleRule = (ruleId: string, currentEnabled: boolean) => {
     const enabling = !currentEnabled
-    updateRule.mutate({ ruleId, data: { enabled: enabling } as any }, {
-      onSuccess: () => toast.success(enabling ? 'Rule enabled' : 'Rule disabled'),
-      onError: () => toast.error('Failed to update rule'),
-    })
+    updateRule.mutate({ ruleId, data: { enabled: enabling } as any })
   }
 
   return (
-    <div className="page-container stack-lg">
+    <div className="stack-lg">
       <div className="card">
         <div className="card-header">
-          <div className="tab-toggle">
+          <div className="tab-toggle" style={{ marginBottom: 0 }}>
             <button className={activeTab === 'sequences' ? 'active' : ''} onClick={() => setActiveTab('sequences')}>
               Sequences ({sequences.length})
             </button>
@@ -61,7 +58,7 @@ export default function ControlsPage() {
           {activeTab === 'sequences' && (
             <>
               {seqLoading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Loader2 size={24} className="spin" /></div>
+                <LoadingState rows={4} />
               ) : sequences.length === 0 ? (
                 <div className="empty-state">
                   <h3>No sequences configured</h3>
@@ -96,8 +93,6 @@ export default function ControlsPage() {
                             className="icon-btn-sm"
                             title="Run now"
                             onClick={() => runSequence.mutate(seq.id, {
-                            onSuccess: () => toast.success('Command queued'),
-                            onError: () => toast.error('Failed to run sequence'),
                           })}
                             disabled={runSequence.isPending}
                           >
@@ -115,7 +110,7 @@ export default function ControlsPage() {
           {activeTab === 'rules' && (
             <>
               {rulesLoading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Loader2 size={24} className="spin" /></div>
+                <LoadingState rows={3} />
               ) : rules.length === 0 ? (
                 <div className="empty-state">
                   <h3>No automation rules</h3>
@@ -186,8 +181,7 @@ function CreateSequenceModal({ facilityId, onClose }: { facilityId: string; onCl
       priority: parseInt(form.priority) || 5,
       steps: [{ action: 'set_setpoint', target: 'all_zones', params: {} }],
     }, {
-      onSuccess: () => { toast.success('Sequence created'); onClose() },
-      onError: () => toast.error('Failed to create sequence'),
+      onSuccess: () => onClose(),
     })
   }
 
@@ -255,8 +249,7 @@ function CreateRuleModal({ facilityId, onClose }: { facilityId: string; onClose:
       cooldown_minutes: parseInt(form.cooldown) || 15,
       max_executions_per_day: parseInt(form.maxPerDay) || 10,
     }, {
-      onSuccess: () => { toast.success('Rule created'); onClose() },
-      onError: () => toast.error('Failed to create rule'),
+      onSuccess: () => onClose(),
     })
   }
 

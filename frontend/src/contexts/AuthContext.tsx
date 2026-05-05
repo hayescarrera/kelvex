@@ -18,8 +18,32 @@ interface AuthContextType {
   isLoading: boolean
   permissions: string[]
   hasPermission: (perm: string) => boolean
-  login: (accessToken: string, refreshToken: string) => Promise<void>
+  login: (accessToken: string, refreshToken: string, persist?: boolean) => Promise<void>
   logout: () => void
+}
+
+const TOKEN_KEY = 'kelvex_token'
+const REFRESH_KEY = 'kelvex_refresh_token'
+
+function readToken() {
+  return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY)
+}
+function readRefresh() {
+  return localStorage.getItem(REFRESH_KEY) ?? sessionStorage.getItem(REFRESH_KEY)
+}
+function writeTokens(access: string, refresh: string, persist: boolean) {
+  const store = persist ? localStorage : sessionStorage
+  store.setItem(TOKEN_KEY, access)
+  store.setItem(REFRESH_KEY, refresh)
+}
+function clearTokens() {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(REFRESH_KEY)
+  sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(REFRESH_KEY)
+}
+function isPersisted() {
+  return !!localStorage.getItem(TOKEN_KEY)
 }
 
 const AuthCtx = createContext<AuthContextType>({
@@ -44,8 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasPermission = useCallback((perm: string) => permissions.includes(perm), [permissions])
 
   const logout = useCallback(() => {
-    sessionStorage.removeItem('coldgrid_token')
-    sessionStorage.removeItem('coldgrid_refresh_token')
+    clearTokens()
     api.setTokens(null, null)
     setUser(null)
     setPermissions([])
@@ -56,19 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const perms = await api.getMyPermissions()
       setPermissions(perms.permissions)
     } catch {
-      // Non-critical — permissions will be empty
+      // Non-critical
     }
   }, [])
 
-  const login = useCallback(async (accessToken: string, refreshToken: string) => {
-    sessionStorage.setItem('coldgrid_token', accessToken)
-    sessionStorage.setItem('coldgrid_refresh_token', refreshToken)
+  const login = useCallback(async (accessToken: string, refreshToken: string, persist = false) => {
+    writeTokens(accessToken, refreshToken, persist)
     api.setTokens(accessToken, refreshToken)
     const u = await api.getMe()
+    // Persist any refreshed tokens that came back during getMe
     const latestAccess = api.getToken()
     const latestRefresh = api.getRefreshToken()
-    if (latestAccess) sessionStorage.setItem('coldgrid_token', latestAccess)
-    if (latestRefresh) sessionStorage.setItem('coldgrid_refresh_token', latestRefresh)
+    if (latestAccess && latestRefresh) writeTokens(latestAccess, latestRefresh, persist)
     setUser(u as User)
     await fetchPermissions()
   }, [fetchPermissions])
@@ -79,12 +101,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout])
 
   useEffect(() => {
-    const accessToken = sessionStorage.getItem('coldgrid_token')
-    const refreshToken = sessionStorage.getItem('coldgrid_refresh_token')
+    const accessToken = readToken()
+    const refreshToken = readRefresh()
     if (!accessToken || !refreshToken) {
       setIsLoading(false)
       return
     }
+    const persist = isPersisted()
     api.setTokens(accessToken, refreshToken)
     Promise.all([api.getMe(), api.getMyPermissions()])
       .then(([u, perms]) => {
@@ -92,12 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPermissions(perms.permissions)
         const latest = api.getToken()
         const latestR = api.getRefreshToken()
-        if (latest) sessionStorage.setItem('coldgrid_token', latest)
-        if (latestR) sessionStorage.setItem('coldgrid_refresh_token', latestR)
+        if (latest && latestR) writeTokens(latest, latestR, persist)
       })
       .catch(() => {
-        sessionStorage.removeItem('coldgrid_token')
-        sessionStorage.removeItem('coldgrid_refresh_token')
+        clearTokens()
         api.setTokens(null, null)
       })
       .finally(() => setIsLoading(false))

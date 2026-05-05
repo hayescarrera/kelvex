@@ -11,7 +11,7 @@ class TestHealth:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] in {"healthy", "degraded"}
-        assert data["service"] == "coldgrid-api"
+        assert data["service"] == "kelvex-api"
         assert "checks" in data
         assert data["checks"]["database"] in {"healthy", "unhealthy"}
         assert data["checks"]["redis"] in {"healthy", "unhealthy"}
@@ -20,7 +20,7 @@ class TestHealth:
         resp = await client.get("/health")
         assert resp.status_code == 200
         assert "X-Request-Id" in resp.headers
-        assert "X-ColdGrid-Version" in resp.headers
+        assert "X-Kelvex-Version" in resp.headers
 
     async def test_docs_available(self, client: AsyncClient):
         resp = await client.get("/docs")

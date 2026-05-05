@@ -2,14 +2,29 @@
 # Kelvex Edge Agent — Quick Install Script
 #
 # Run on the gateway device (Raspberry Pi, Intel NUC, etc.):
-#   curl -sL https://releases.kelvex.io/agent/latest/install.sh | sudo bash
+#   curl -fsSL https://github.com/kelvex/platform/releases/latest/download/install.sh | sudo bash
 #
 # Or manually:
 #   chmod +x install.sh && sudo ./install.sh
 
 set -euo pipefail
 
-BINARY_URL="${KELVEX_BINARY_URL:-https://releases.kelvex.io/agent/latest/kelvex-agent-linux-$(dpkg --print-architecture)}"
+GITHUB_REPO="${KELVEX_GITHUB_REPO:-hayescarrera/kelvex}"
+BASE_URL="https://github.com/${GITHUB_REPO}/releases/latest/download"
+
+# Map uname -m to the binary suffix produced by `make build-all`
+_ARCH=$(uname -m)
+case "$_ARCH" in
+  x86_64)         _SUFFIX="linux-amd64" ;;
+  aarch64|arm64)  _SUFFIX="linux-arm64" ;;
+  armv7l|armhf)   _SUFFIX="linux-armv7" ;;
+  *)
+    echo "Unsupported architecture: $_ARCH"
+    exit 1
+    ;;
+esac
+
+BINARY_URL="${KELVEX_BINARY_URL:-${BASE_URL}/kelvex-agent-${_SUFFIX}}"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="/etc/kelvex"
 DATA_DIR="/var/lib/kelvex"
@@ -39,7 +54,7 @@ chown kelvex:kelvex "$DATA_DIR"
 # Download binary
 echo "→ Downloading agent binary..."
 if command -v curl &>/dev/null; then
-  curl -sL "$BINARY_URL" -o "$INSTALL_DIR/kelvex-agent"
+  curl -fsSL "$BINARY_URL" -o "$INSTALL_DIR/kelvex-agent"
 elif command -v wget &>/dev/null; then
   wget -q "$BINARY_URL" -O "$INSTALL_DIR/kelvex-agent"
 else
@@ -54,32 +69,7 @@ echo "→ Verifying binary..."
 
 # Install systemd service
 echo "→ Installing systemd service..."
-cat > /etc/systemd/system/kelvex-agent.service <<'EOF'
-[Unit]
-Description=Kelvex Edge Agent — Compressor Monitoring
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=kelvex
-Group=kelvex
-ExecStart=/usr/local/bin/kelvex-agent -config /etc/kelvex/agent.yaml
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=kelvex-agent
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/var/lib/kelvex
-ReadOnlyPaths=/etc/kelvex
-MemoryMax=256M
-
-[Install]
-WantedBy=multi-user.target
-EOF
+curl -fsSL "${BASE_URL}/kelvex-agent.service" -o /etc/systemd/system/kelvex-agent.service
 
 systemctl daemon-reload
 

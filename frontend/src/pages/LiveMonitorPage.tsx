@@ -82,7 +82,7 @@ export default function LiveMonitorPage() {
 
   if (loading && !data) {
     return (
-      <div className="page-container">
+      <div>
         <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
           <Activity size={32} style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
           <div>Connecting to live telemetry...</div>
@@ -94,7 +94,7 @@ export default function LiveMonitorPage() {
   const summary = data?.org_summary
 
   return (
-    <div className="page-container">
+    <div>
       <PageHeader
         title="Live Monitor"
         subtitle="Real-time compressor telemetry across all sites"

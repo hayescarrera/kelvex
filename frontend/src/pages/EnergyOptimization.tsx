@@ -37,7 +37,7 @@ export default function EnergyOptimization() {
   if (isLoading) return <LoadingState />
 
   return (
-    <div className="page-container">
+    <div>
       <PageHeader
         title="Energy Optimization"
         subtitle={facility ? `${facility.name} — Load Shifting & Demand Management` : 'Load Shifting & Demand Management'}

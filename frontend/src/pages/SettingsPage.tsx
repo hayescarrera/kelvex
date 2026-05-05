@@ -32,7 +32,7 @@ export default function SettingsPage() {
 
   // Temperature unit — persisted in localStorage
   const [tempUnit, setTempUnit] = useState<TempUnit>(() =>
-    (localStorage.getItem('coldgrid_temp_unit') as TempUnit) || 'F'
+    (localStorage.getItem('kelvex_temp_unit') as TempUnit) || 'F'
   )
 
   // Notification channel management
@@ -81,7 +81,7 @@ export default function SettingsPage() {
 
   const handleTempUnitChange = (unit: TempUnit) => {
     setTempUnit(unit)
-    localStorage.setItem('coldgrid_temp_unit', unit)
+    localStorage.setItem('kelvex_temp_unit', unit)
   }
 
   const handleAddChannel = async () => {

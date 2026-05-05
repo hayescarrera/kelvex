@@ -38,7 +38,7 @@ export default function BillsPage() {
     val != null ? val.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : '—'
 
   return (
-    <div className="page-container">
+    <div className="stack-lg">
       <div className="card">
         <div className="card-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
