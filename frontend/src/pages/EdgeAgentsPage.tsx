@@ -1,13 +1,13 @@
 /**
  * Edge Agents — IoT gateway management page.
  *
- * This is the control center for connecting physical compressor controllers
- * to ColdGrid. The flow for a technician:
+ * This is the control center for connecting refrigeration controllers
+ * to Kelvex. The flow for a technician:
  *
  *   1. Register an agent (gets an API key)
- *   2. Pick a controller profile (Frick Quantum, Vilter VSM, etc.)
- *   3. Enter the controller's IP address on the plant network
- *   4. Link it to a compressor in ColdGrid
+ *   2. Pick a controller profile (Emerson E2, Danfoss AK-SC, etc.)
+ *   3. Enter the controller's IP address on the site network
+ *   4. Link it to a rack/site in Kelvex
  *   5. Download the config file → drop on the gateway device
  *   6. Data starts flowing
  */
@@ -70,7 +70,7 @@ export default function EdgeAgentsPage() {
         <StatCard label="Total Agents" value={String(agents.length)} icon={<Server size={16} />} color="var(--accent)" />
         <StatCard label="Connected" value={String(connected)} icon={<Wifi size={16} />} color="var(--success)" />
         <StatCard label="Offline" value={String(offline)} icon={<WifiOff size={16} />} color={offline > 0 ? 'var(--danger)' : 'var(--text-tertiary)'} />
-        <StatCard label="Facility" value={site?.name ?? '—'} icon={<HardDrive size={16} />} color="var(--accent)" />
+        <StatCard label="Facility" value={site?.name ?? ''} icon={<HardDrive size={16} />} color="var(--accent)" />
       </div>
 
       {showRegister && (
@@ -259,8 +259,8 @@ function AgentCard({ agent, facilityId, expanded, onToggle }: {
         <div className="card-body stack-md">
           {/* Agent info row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-            <InfoItem label="IP Address" value={agent.ip_address || '—'} />
-            <InfoItem label="Hardware" value={agent.hardware_type || '—'} />
+            <InfoItem label="IP Address" value={agent.ip_address || ''} />
+            <InfoItem label="Hardware" value={agent.hardware_type || ''} />
             <InfoItem label="Last Telemetry" value={formatTime(agent.last_telemetry_at)} />
             <InfoItem label="Pending Commands" value={String(agent.pending_commands)} />
           </div>

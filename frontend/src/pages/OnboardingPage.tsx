@@ -215,7 +215,7 @@ export default function OnboardingPage() {
                       borderRadius: 6, fontSize: 12, overflow: 'auto',
                     }}>
 {`# Download and install the Kelvex agent
-curl -fsSL https://github.com/hayescarrera/kelvex/releases/latest/download/install.sh | sudo bash
+curl -fsSL https://get.kelvex.io/agent/install.sh | sudo bash
 
 # Edit /etc/kelvex/agent.yaml — set your agent key:
 #   key: ${agentToken}
@@ -259,17 +259,25 @@ sudo systemctl start kelvex-agent`}
               </div>
               <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>You're All Set!</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: 14, maxWidth: 440, margin: '0 auto 24px' }}>
-                Your facility is created and your agent is provisioned.
-                Head to the dashboard to start monitoring.
+                Your facility is created and your agent is provisioned. Here's what to do next.
               </p>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                <button className="btn-primary" onClick={() => navigate('/')}>
-                  Go to Dashboard
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 380, margin: '0 auto 24px', textAlign: 'left' }}>
+                <button className="btn-ghost" onClick={() => navigate('/leak-tracking')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 8, border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
+                  <Wifi size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <div><div style={{ fontWeight: 600, fontSize: 13 }}>Check Leak Tracking</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>See open leaks and refrigerant-add log</div></div>
                 </button>
-                <button className="btn-secondary" onClick={() => navigate('/settings')}>
-                  Configure Settings
+                <button className="btn-ghost" onClick={() => navigate('/alerts')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 8, border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
+                  <Zap size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                  <div><div style={{ fontWeight: 600, fontSize: 13 }}>Configure Alert Rules</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Set thresholds for leak and temperature alerts</div></div>
+                </button>
+                <button className="btn-ghost" onClick={() => navigate('/settings')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 8, border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
+                  <Radio size={16} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                  <div><div style={{ fontWeight: 600, fontSize: 13 }}>Settings & Notifications</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Configure email alerts and team access</div></div>
                 </button>
               </div>
+              <button className="btn-primary" onClick={() => navigate('/')}>
+                Go to Dashboard
+              </button>
             </div>
           )}
         </div>

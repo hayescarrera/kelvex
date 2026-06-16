@@ -21,6 +21,8 @@ bcrypt==4.2.1
 # Data processing
 pandas==2.2.3
 numpy==2.2.1
+scipy==1.17.1
+statsmodels==0.14.6
 
 # HTTP client (integration adapters, OpenEI API)
 httpx==0.28.1

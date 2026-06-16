@@ -564,10 +564,10 @@ export default function FacilityMapPage() {
                                 fontSize: 22 * zoom, fontWeight: 700, fontFamily: 'monospace', lineHeight: 1.1,
                                 color: tempColor(zone.current_temp, zone.temp_setpoint, zone.temp_alarm_high, zone.temp_alarm_low),
                               }}>
-                                {zone.current_temp != null ? `${zone.current_temp.toFixed(1)}°` : '—'}
+                                {zone.current_temp != null ? `${zone.current_temp.toFixed(1)}°` : ''}
                               </div>
                               <div style={{ fontSize: 9 * zoom, color: 'var(--text-tertiary)' }}>
-                                Set: {zone.temp_setpoint ?? '—'}° {zone.temp_unit === 'degC' ? 'C' : 'F'}
+                                Set: {zone.temp_setpoint ?? ''}° {zone.temp_unit === 'degC' ? 'C' : 'F'}
                               </div>
                               {zone.door_open && (
                                 <div style={{
@@ -734,7 +734,7 @@ export default function FacilityMapPage() {
                           fontSize: 14, fontWeight: 700, fontFamily: 'monospace',
                           color: tempColor(z.current_temp, z.temp_setpoint, z.temp_alarm_high, z.temp_alarm_low),
                         }}>
-                          {z.current_temp != null ? `${z.current_temp.toFixed(1)}°` : '—'}
+                          {z.current_temp != null ? `${z.current_temp.toFixed(1)}°` : ''}
                         </div>
                       </div>
                     ))}

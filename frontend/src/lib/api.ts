@@ -470,6 +470,10 @@ class ApiClient {
     return this.request<SavingsResult>(`/facilities/${facilityId}/savings/simulate`)
   }
 
+  async getSavingsReport(facilityId: string) {
+    return this.request<SavingsReport>(`/facilities/${facilityId}/savings/report`)
+  }
+
   // ── Integrations ────────────────────────────
   async listProviders() {
     return this.request<{ providers: IntegrationProvider[] }>('/integrations/providers')
@@ -683,6 +687,12 @@ class ApiClient {
     )
   }
 
+  async getHealthTrend(facilityId: string, compressorId: string, days = 30) {
+    return this.request<CompressorHealthTrend>(
+      `/facilities/${facilityId}/compressors/${compressorId}/health-trend?days=${days}`
+    )
+  }
+
   // ── Live Monitor ────────────────────────────
   async getLiveMonitor() {
     return this.request<LiveMonitorResponse>('/live-monitor')
@@ -720,6 +730,25 @@ class ApiClient {
   async getControlAuditLog(facilityId: string, limit = 50) {
     return this.request<{ logs: ControlAuditEntry[]; total: number }>(
       `/facilities/${facilityId}/control/audit-log?limit=${limit}`
+    )
+  }
+
+  async listPlantCommands(facilityId: string, state?: string) {
+    const qs = state ? `?state=${state}` : ''
+    return this.request<{ commands: PlantCommand[]; total: number }>(
+      `/facilities/${facilityId}/control/commands${qs}`
+    )
+  }
+
+  async cancelPlantCommand(facilityId: string, commandId: string) {
+    return this.request<{ status: string; command_id: string }>(
+      `/facilities/${facilityId}/control/commands/${commandId}/cancel`, { method: 'POST' }
+    )
+  }
+
+  async approvePlantCommand(facilityId: string, commandId: string) {
+    return this.request<{ status: string; command_id: string }>(
+      `/facilities/${facilityId}/control/commands/${commandId}/approve`, { method: 'POST' }
     )
   }
 
@@ -919,6 +948,14 @@ class ApiClient {
     return this.request<MaintenanceTaskEntry>('/maintenance/tasks', { method: 'POST', body: data })
   }
 
+  async createWorkOrderFromAlert(alertId: string) {
+    return this.request<MaintenanceTaskEntry>('/maintenance/tasks/from-alert', { method: 'POST', body: { alert_id: alertId } })
+  }
+
+  async createWorkOrderFromLeakEvent(leakEventId: string) {
+    return this.request<MaintenanceTaskEntry>('/maintenance/tasks/from-leak-event', { method: 'POST', body: { leak_event_id: leakEventId } })
+  }
+
   async listMaintenanceTasks(params?: {
     facility_id?: string; state?: string; category?: string;
     priority?: string; assigned_to?: string; limit?: number; offset?: number;
@@ -948,6 +985,107 @@ class ApiClient {
   async listOverdueTasks(facilityId?: string) {
     const qs = facilityId ? `?facility_id=${facilityId}` : ''
     return this.request<{ tasks: MaintenanceTaskEntry[]; total: number }>(`/maintenance/overdue${qs}`)
+  }
+
+  // ── Refrigerant Circuits ──────────────────
+  listRacks(facilityId?: string): Promise<{ racks: RackTelemetry[] }> {
+    const qs = facilityId ? `?facility_id=${facilityId}` : ''
+    return this.request<{ racks: RackTelemetry[] }>(`/refrigerant/racks${qs}`)
+  }
+
+  listCircuits(facilityId?: string): Promise<{ circuits: RefrigerantCircuit[] }> {
+    const qs = facilityId ? `?facility_id=${facilityId}` : ''
+    return this.request<{ circuits: RefrigerantCircuit[] }>(`/refrigerant/circuits${qs}`)
+  }
+
+  createCircuit(data: Record<string, unknown>): Promise<RefrigerantCircuit> {
+    return this.request<RefrigerantCircuit>('/refrigerant/circuits', { method: 'POST', body: data })
+  }
+
+  updateCircuit(id: string, data: Record<string, unknown>): Promise<RefrigerantCircuit> {
+    return this.request<RefrigerantCircuit>(`/refrigerant/circuits/${id}`, { method: 'PATCH', body: data })
+  }
+
+  // ── Leak Events ───────────────────────────
+  listLeakEvents(params?: { facility_id?: string; status?: string; limit?: number }): Promise<{ leak_events: LeakEvent[]; total: number }> {
+    const query = new URLSearchParams()
+    if (params?.facility_id) query.set('facility_id', params.facility_id)
+    if (params?.status) query.set('status', params.status)
+    if (params?.limit) query.set('limit', String(params.limit))
+    const qs = query.toString()
+    return this.request<{ leak_events: LeakEvent[]; total: number }>(`/refrigerant/leak-events${qs ? '?' + qs : ''}`)
+  }
+
+  createLeakEvent(data: Record<string, unknown>): Promise<LeakEvent> {
+    return this.request<LeakEvent>('/refrigerant/leak-events', { method: 'POST', body: data })
+  }
+
+  updateLeakEvent(id: string, data: Record<string, unknown>): Promise<LeakEvent> {
+    return this.request<LeakEvent>(`/refrigerant/leak-events/${id}`, { method: 'PATCH', body: data })
+  }
+
+  // ── Refrigerant Adds ──────────────────────
+  listRefrigerantAdds(params?: { facility_id?: string; circuit_id?: string; limit?: number }): Promise<{ adds: RefrigerantAdd[]; total: number }> {
+    const query = new URLSearchParams()
+    if (params?.facility_id) query.set('facility_id', params.facility_id)
+    if (params?.circuit_id) query.set('circuit_id', params.circuit_id)
+    if (params?.limit) query.set('limit', String(params.limit))
+    const qs = query.toString()
+    return this.request<{ adds: RefrigerantAdd[]; total: number }>(`/refrigerant/adds${qs ? '?' + qs : ''}`)
+  }
+
+  createRefrigerantAdd(data: Record<string, unknown>): Promise<RefrigerantAdd> {
+    return this.request<RefrigerantAdd>('/refrigerant/adds', { method: 'POST', body: data })
+  }
+
+  // ── Repairs ───────────────────────────────
+  listRepairs(params?: { facility_id?: string; leak_event_id?: string; limit?: number }): Promise<{ repairs: RepairRecord[]; total: number }> {
+    const query = new URLSearchParams()
+    if (params?.facility_id) query.set('facility_id', params.facility_id)
+    if (params?.leak_event_id) query.set('leak_event_id', params.leak_event_id)
+    if (params?.limit) query.set('limit', String(params.limit))
+    const qs = query.toString()
+    return this.request<{ repairs: RepairRecord[]; total: number }>(`/refrigerant/repairs${qs ? '?' + qs : ''}`)
+  }
+
+  createRepair(data: Record<string, unknown>): Promise<RepairRecord> {
+    return this.request<RepairRecord>('/refrigerant/repairs', { method: 'POST', body: data })
+  }
+
+  detectCallback(repairId: string): Promise<{ callback_detected: boolean | null; callback_lbs_within_30d?: number; reason?: string }> {
+    return this.request(`/refrigerant/repairs/${repairId}/detect-callback`, { method: 'POST' })
+  }
+
+  // ── Dashboard + AIM Act ───────────────────
+  getRefrigerantDashboard(facilityId?: string): Promise<RefrigerantDashboard> {
+    const qs = facilityId ? `?facility_id=${facilityId}` : ''
+    return this.request<RefrigerantDashboard>(`/refrigerant/dashboard${qs}`)
+  }
+
+  getAIMActSummary(facilityId?: string): Promise<AIMActSummary> {
+    const qs = facilityId ? `?facility_id=${facilityId}` : ''
+    return this.request<AIMActSummary>(`/refrigerant/aim-act${qs}`)
+  }
+
+  // ── Detection & Forecasting ───────────────
+  getDetectionSettings(): Promise<DetectionSettings> {
+    return this.request<DetectionSettings>('/detection/settings')
+  }
+
+  updateDetectionSettings(data: Partial<DetectionSettings>): Promise<DetectionSettings> {
+    return this.request<DetectionSettings>('/detection/settings', { method: 'PATCH', body: data })
+  }
+
+  getDetectionForecasts(facilityId?: string): Promise<CircuitForecast[]> {
+    const qs = facilityId ? `?facility_id=${facilityId}` : ''
+    return this.request<CircuitForecast[]>(`/detection/forecasts${qs}`)
+  }
+
+  getDetectionInsights(facilityId?: string, days = 30): Promise<DetectionInsights> {
+    const params = new URLSearchParams()
+    if (facilityId) params.set('facility_id', facilityId)
+    params.set('days', String(days))
+    return this.request<DetectionInsights>(`/detection/insights?${params}`)
   }
 
   // ── Escalation ────────────────────────────
@@ -1372,6 +1510,37 @@ export interface SavingsResult {
   } | null
 }
 
+export interface SavingsReport {
+  facility_id: string
+  facility_name: string
+  report_period: { start: string; end: string }
+  energy_savings: {
+    available: boolean
+    bills_analyzed: number
+    annual_bill_total: number
+    demand_savings_est: number
+    energy_savings_est: number
+    total_est: number
+    demand_reduction_pct: number
+    energy_reduction_pct: number
+  }
+  refrigerant_savings: {
+    total_lbs_added_12m: number
+    refrigerant_cost_12m: number
+    charge_deficit_pct: number
+    energy_penalty_pct: number
+    refrigerant_energy_penalty_cost: number
+    total_refrigerant_impact: number
+  }
+  total_quantified_savings: number
+  methodology: {
+    demand_response: string
+    energy_optimization: string
+    refrigerant_efficiency: string
+    refrigerant_cost: string
+  }
+}
+
 // ── Integration Types ──────────────────────────────────
 
 export interface IntegrationProvider {
@@ -1475,20 +1644,45 @@ export interface NotificationLogRecord {
 }
 
 // ── User/Org Types ─────────────────────────────────
-export type UserRole = 'owner' | 'admin' | 'plant_manager' | 'technician' | 'operator' | 'viewer'
+export type UserRole =
+  | 'kelvex_admin'
+  | 'owner'
+  | 'admin'
+  | 'finance'
+  | 'ops_manager'
+  | 'technician'
+  | 'plant_manager'   // legacy
+  | 'operator'        // legacy
+  | 'viewer'          // legacy
 
 export const ROLE_LABELS: Record<UserRole, string> = {
+  kelvex_admin: 'Kelvex Admin',
   owner: 'Owner',
   admin: 'Admin',
-  plant_manager: 'Plant Manager',
+  finance: 'Finance',
+  ops_manager: 'Operations Manager',
   technician: 'Technician',
+  plant_manager: 'Plant Manager',
   operator: 'Operator',
   viewer: 'Viewer',
 }
 
-export const ROLE_ORDER: UserRole[] = ['owner', 'admin', 'plant_manager', 'technician', 'operator', 'viewer']
+export const ROLE_ORDER: UserRole[] = [
+  'kelvex_admin', 'owner', 'admin', 'finance', 'ops_manager',
+  'technician', 'plant_manager', 'operator', 'viewer',
+]
 
-export const GLOBAL_ACCESS_ROLES: UserRole[] = ['owner', 'admin']
+export const GLOBAL_ACCESS_ROLES: UserRole[] = ['kelvex_admin', 'owner', 'admin']
+
+/** Returns the default landing route for a given role. */
+export function roleHome(role: UserRole): string {
+  switch (role) {
+    case 'finance':    return '/energy'
+    case 'technician': return '/sites'
+    case 'kelvex_admin': return '/admin'
+    default:           return '/'
+  }
+}
 
 export interface FacilityAccess {
   facility_id: string
@@ -1729,6 +1923,29 @@ export interface ControlAuditEntry {
   parameters: Record<string, unknown> | null
   result: string | null
   created_at: string | null
+}
+
+export interface CompressorHealthTrend {
+  compressor_id: string
+  compressor_name: string
+  current_health_score: number | null
+  trend_slope_per_day: number | null
+  days_to_maintenance_threshold: number | null
+  projected_maintenance_date: string | null
+  maintenance_urgency: 'immediate' | 'soon' | 'monitor' | 'healthy'
+  daily_scores: { date: string | null; score: number | null; reading_count: number }[]
+}
+
+export interface PlantCommand {
+  id: string
+  command_type: string
+  parameters: Record<string, unknown>
+  state: string
+  priority: number
+  source: string
+  issued_at: string | null
+  completed_at: string | null
+  error_message: string | null
 }
 
 // ── Live Monitor Types ───────────────────────────
@@ -2076,3 +2293,159 @@ export interface EscalationEventEntry {
 }
 
 export const api = new ApiClient()
+
+// ── Refrigerant Types ───────────────────────────
+
+export interface RackTelemetry {
+  rack_id: string
+  rack_name: string
+  suction_group: string | null
+  total_kw: number | null
+  active_compressors: number | null
+  avg_suction_psi: number | null
+  avg_discharge_psi: number | null
+  design_suction_psi: number | null
+  design_discharge_psi: number | null
+}
+
+export interface RefrigerantCircuit {
+  id: string
+  facility_id: string
+  name: string
+  refrigerant_type: string
+  full_charge_lbs: number | null
+  rack_id: string | null
+  rack: RackTelemetry | null
+  equipment_id: string | null
+  zone_id: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface LeakEvent {
+  id: string
+  facility_id: string
+  circuit_id: string | null
+  rack_name: string
+  zone_name: string | null
+  detection_method: string
+  confidence: string
+  status: string
+  detected_at: string
+  confirmed_at: string | null
+  repaired_at: string | null
+  closed_at: string | null
+  estimated_loss_lbs: number | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RefrigerantAdd {
+  id: string
+  facility_id: string
+  circuit_id: string | null
+  leak_event_id: string | null
+  rack_name: string
+  refrigerant_type: string
+  amount_lbs: number
+  cost_per_lb: number | null
+  technician_name: string
+  added_at: string
+  notes: string | null
+  created_at: string
+}
+
+export interface RepairRecord {
+  id: string
+  facility_id: string
+  circuit_id: string | null
+  leak_event_id: string | null
+  rack_name: string
+  description: string
+  technician_name: string
+  technician_company: string | null
+  repaired_at: string
+  parts_replaced: string | null
+  verified_leak_free: boolean
+  verification_method: string | null
+  refrigerant_recovered_lbs: number | null
+  notes: string | null
+  callback_detected: boolean | null
+  callback_detected_at: string | null
+  callback_lbs_within_30d: number | null
+  created_at: string
+}
+
+export interface RefrigerantDashboard {
+  open_leak_events: number
+  leak_events_30d: number
+  refrigerant_added_30d_lbs: number
+  repairs_30d: number
+  sites_above_threshold: number
+  per_facility: {
+    facility_id: string
+    name: string
+    open_leaks: number
+    adds_30d_lbs: number
+    leak_rate_pct: number | null
+  }[]
+}
+
+export interface AIMActCircuit {
+  circuit_id: string | null
+  circuit_name: string
+  rack_name: string
+  refrigerant_type: string
+  full_charge_lbs: number | null
+  total_added_lbs: number
+  leak_rate_pct: number | null
+  status: 'compliant' | 'warning' | 'exceeds_threshold' | 'no_charge_data'
+  open_leak_events: number
+  unrepaired_adds: number
+}
+
+export interface AIMActSummary {
+  period_days: number
+  circuits: AIMActCircuit[]
+  facility_summary: {
+    total_added_lbs: number
+    avg_leak_rate_pct: number | null
+    circuits_above_threshold: number
+  }
+}
+
+export interface DetectionSettings {
+  auto_detection: boolean
+  forecasting: boolean
+}
+
+export interface CircuitForecast {
+  circuit_id: string
+  circuit_name: string | null
+  org_id: string
+  method: string
+  projected_adds_lbs: number | null
+  projected_adds_lbs_low: number | null
+  projected_adds_lbs_high: number | null
+  lbs_per_day: number | null
+  days_to_aim_threshold: number | null
+  days_to_aim_warning: number | null
+  current_annual_leak_rate_pct: number | null
+  confidence: 'low' | 'medium' | 'high' | null
+  horizon_days: number
+  computed_at: string
+}
+
+export interface DetectionInsights {
+  auto_detected_events: number
+  manual_events: number
+  detection_breakdown: {
+    pressure_trend: number
+    refrigerant_add_pattern: number
+    multi_signal: number
+  }
+  circuits_forecasted: number
+  circuits_approaching_threshold: number
+}

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import { api } from '../lib/api'
+import { api, roleHome } from '../lib/api'
 
 import type { UserRole } from '../lib/api'
 
@@ -20,6 +20,8 @@ interface AuthContextType {
   hasPermission: (perm: string) => boolean
   login: (accessToken: string, refreshToken: string, persist?: boolean) => Promise<void>
   logout: () => void
+  /** The default landing route for the current user's role. */
+  homeRoute: string
 }
 
 const TOKEN_KEY = 'kelvex_token'
@@ -54,6 +56,7 @@ const AuthCtx = createContext<AuthContextType>({
   hasPermission: () => false,
   login: async () => {},
   logout: () => {},
+  homeRoute: '/',
 })
 
 export function useAuth() {
@@ -124,8 +127,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsLoading(false))
   }, [])
 
+  const homeRoute = user ? roleHome(user.role) : '/'
+
   return (
-    <AuthCtx.Provider value={{ user, isAuthenticated: !!user, isLoading, permissions, hasPermission, login, logout }}>
+    <AuthCtx.Provider value={{ user, isAuthenticated: !!user, isLoading, permissions, hasPermission, login, logout, homeRoute }}>
       {children}
     </AuthCtx.Provider>
   )

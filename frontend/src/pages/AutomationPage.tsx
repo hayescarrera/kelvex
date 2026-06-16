@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { useLocation } from 'react-router-dom'
-import { Loader2, Play, Plus, X, Power, PowerOff, Clock, Zap, Trash2, AlertTriangle } from 'lucide-react'
+import { Play, Plus, X, Power, PowerOff, Clock, Zap, Trash2, AlertTriangle } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import StatCard from '../components/ui/StatCard'
+import LoadingState from '../components/ui/LoadingState'
 import { useSiteContext } from '../contexts/SiteContext'
 import {
   useSequences, useCreateSequence, useRunSequence,
@@ -83,7 +84,7 @@ export default function AutomationPage() {
           <div className="card">
             <div className="card-body" style={{ padding: 0 }}>
               {schedLoading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Loader2 size={24} className="spin" /></div>
+                <LoadingState />
               ) : schedules.length === 0 ? (
                 <div className="empty-state">
                   <h3>No schedules</h3>
@@ -164,7 +165,7 @@ export default function AutomationPage() {
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             {seqLoading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Loader2 size={24} className="spin" /></div>
+              <LoadingState />
             ) : sequences.length === 0 ? (
               <div className="empty-state">
                 <h3>No sequences configured</h3>
@@ -217,7 +218,7 @@ export default function AutomationPage() {
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             {rulesLoading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Loader2 size={24} className="spin" /></div>
+              <LoadingState />
             ) : rules.length === 0 ? (
               <div className="empty-state">
                 <h3>No trigger rules</h3>

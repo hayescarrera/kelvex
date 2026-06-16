@@ -47,9 +47,9 @@ function ChangesDisplay({ changes }: { changes: Record<string, { old: unknown; n
       {entries.map(([field, { old: oldVal, new: newVal }]) => (
         <div key={field} style={{ marginBottom: 2 }}>
           <span style={{ fontWeight: 600 }}>{field}:</span>{' '}
-          <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{String(oldVal ?? '—')}</span>
+          <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{String(oldVal ?? '')}</span>
           {' → '}
-          <span style={{ fontWeight: 500 }}>{String(newVal ?? '—')}</span>
+          <span style={{ fontWeight: 500 }}>{String(newVal ?? '')}</span>
         </div>
       ))}
     </div>

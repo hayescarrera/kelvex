@@ -141,7 +141,7 @@ export default function ZonesPage() {
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem', marginBottom: '0.75rem' }}>
                 <span style={{ fontSize: '2.25rem', fontWeight: 700, color }}>
-                  {zone.current_temp != null ? zone.current_temp : '—'}
+                  {zone.current_temp != null ? zone.current_temp : ''}
                 </span>
                 <span className="cell-secondary" style={{ fontSize: '1rem' }}>°{zone.temp_unit || 'F'}</span>
               </div>
@@ -150,13 +150,13 @@ export default function ZonesPage() {
                 <div>
                   <div className="text-muted">Setpoint</div>
                   <div className="cell-primary">
-                    {zone.temp_setpoint != null ? `${zone.temp_setpoint}°${zone.temp_unit || 'F'}` : '—'}
+                    {zone.temp_setpoint != null ? `${zone.temp_setpoint}°${zone.temp_unit || 'F'}` : ''}
                   </div>
                 </div>
                 <div>
                   <div className="text-muted">Humidity</div>
                   <div className="cell-primary">
-                    {zone.current_humidity != null ? `${zone.current_humidity}%` : '—'}
+                    {zone.current_humidity != null ? `${zone.current_humidity}%` : ''}
                   </div>
                 </div>
                 <div>

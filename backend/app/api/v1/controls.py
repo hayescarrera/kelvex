@@ -167,10 +167,17 @@ async def delete_sequence(
 @router.post("/sequences/{sequence_id}/run", response_model=ControlSequenceResponse)
 async def run_sequence(
     facility_id: UUID, sequence_id: UUID,
+    body: dict = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Manually trigger a control sequence — creates CommandQueue entries for each step."""
+    """Manually trigger a control sequence — creates CommandQueue entries for each step.
+
+    Pass {"require_approval": true} in the body to hold commands in pending_approval
+    state until an operator explicitly approves each one. Use this for high-risk
+    sequences or automated triggers that should not fire without human review.
+    """
+    body = body or {}
     logger = logging.getLogger("coldgrid.controls")
     await _get_facility(facility_id, current_user, db)
     result = await db.execute(
@@ -208,6 +215,8 @@ async def run_sequence(
 
     now = datetime.now(timezone.utc)
     commands_created = 0
+    require_approval = bool(body.get("require_approval", False))
+    initial_state = "pending_approval" if require_approval else "pending"
 
     # Sort steps by order field (if present), then iterate
     sorted_steps = sorted(steps, key=lambda s: s.get("order", 0))
@@ -245,8 +254,9 @@ async def run_sequence(
             target_equipment_id=target_equipment_id,
             target_zone_id=target_zone_id,
             parameters=step.get("params", {}),
-            state="pending",
+            state=initial_state,
             priority=seq.priority,
+            source="automation" if require_approval else "user",
             issued_by=current_user.id,
             issued_at=now,
             expires_at=now + timedelta(hours=1),

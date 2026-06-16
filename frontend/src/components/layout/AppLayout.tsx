@@ -5,19 +5,47 @@ import Sidebar from './Sidebar'
 import KelvexLogo from '../ui/KelvexLogo'
 import { useAlertSummary } from '../../hooks/useAlerts'
 
+function getPageTitle(pathname: string): string {
+  if (pathname === '/') return 'Dashboard'
+  if (pathname === '/alerts') return 'Alerts'
+  if (pathname === '/alert-rules') return 'Alert Rules'
+  if (pathname === '/leak-tracking') return 'Leak Tracking'
+  if (pathname === '/compliance') return 'Compliance'
+  if (pathname === '/food-safety') return 'Food Safety'
+  if (pathname === '/maintenance') return 'Maintenance & Audit'
+  if (pathname === '/reports') return 'Reports & Exports'
+  if (pathname === '/documents') return 'Documents'
+  if (pathname === '/refrigerant') return 'Refrigerant & Compliance'
+  if (pathname === '/energy') return 'Energy & Cost'
+  if (pathname === '/sites') return 'Sites'
+  if (pathname === '/operations') return 'Fleet Health'
+  if (pathname === '/tunnel') return 'Controller Access'
+  if (pathname === '/admin') return 'Admin Console'
+  if (pathname === '/settings') return 'Settings'
+  if (pathname === '/agents') return 'Edge Agents'
+  if (pathname === '/team') return 'Team'
+  if (pathname === '/activity') return 'Activity Log'
+  if (pathname === '/onboarding') return 'Setup'
+  if (pathname === '/demand') return 'Demand'
+  if (pathname === '/savings') return 'Savings Simulator'
+  if (pathname === '/bills') return 'Utility Bills'
+  if (pathname === '/compare') return 'Site Comparison'
+  if (pathname === '/automation' || pathname === '/schedules') return 'Automation'
+  if (pathname.startsWith('/sites/')) return 'Site'
+  if (pathname.startsWith('/facilities/')) return 'Site'
+  return ''
+}
+
 function useDocumentTitle() {
   const { data } = useAlertSummary()
+  const location = useLocation()
   useEffect(() => {
     const critical = data?.by_severity?.critical ?? 0
     const total = data?.total_active ?? 0
-    if (critical > 0) {
-      document.title = `(${critical} critical) Kelvex`
-    } else if (total > 0) {
-      document.title = `(${total} alerts) Kelvex`
-    } else {
-      document.title = 'Kelvex'
-    }
-  }, [data])
+    const alertPrefix = critical > 0 ? `(${critical} critical) ` : total > 0 ? `(${total} alerts) ` : ''
+    const pageTitle = getPageTitle(location.pathname)
+    document.title = alertPrefix + (pageTitle ? `${pageTitle} | Kelvex` : 'Kelvex')
+  }, [data, location.pathname])
 }
 
 function CriticalAlertBanner() {

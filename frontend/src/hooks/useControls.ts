@@ -8,6 +8,8 @@ export const controlKeys = {
   sequences: (facilityId: string) => [...controlKeys.all, 'sequences', facilityId] as const,
   rules: (facilityId: string) => [...controlKeys.all, 'rules', facilityId] as const,
   schedules: (facilityId: string) => [...controlKeys.all, 'schedules', facilityId] as const,
+  commands: (facilityId: string, state?: string) => [...controlKeys.all, 'commands', facilityId, state ?? ''] as const,
+  auditLog: (facilityId: string) => [...controlKeys.all, 'audit-log', facilityId] as const,
 }
 
 export function useSequences(facilityId: string | undefined) {
@@ -116,5 +118,46 @@ export function useDeleteSchedule(facilityId: string) {
       toast.success('Schedule deleted')
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to delete schedule'),
+  })
+}
+
+export function usePlantCommands(facilityId: string | undefined, state?: string) {
+  return useQuery({
+    queryKey: controlKeys.commands(facilityId ?? '', state),
+    queryFn: () => api.listPlantCommands(facilityId!, state),
+    enabled: !!facilityId,
+    refetchInterval: 10_000,
+  })
+}
+
+export function useCancelCommand(facilityId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (commandId: string) => api.cancelPlantCommand(facilityId, commandId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: controlKeys.commands(facilityId) })
+      toast.success('Command cancelled')
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to cancel command'),
+  })
+}
+
+export function useApproveCommand(facilityId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (commandId: string) => api.approvePlantCommand(facilityId, commandId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: controlKeys.commands(facilityId) })
+      toast.success('Command approved')
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to approve command'),
+  })
+}
+
+export function useControlAuditLog(facilityId: string | undefined, limit = 50) {
+  return useQuery({
+    queryKey: controlKeys.auditLog(facilityId ?? ''),
+    queryFn: () => api.getControlAuditLog(facilityId!, limit),
+    enabled: !!facilityId,
   })
 }

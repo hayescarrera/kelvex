@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Loader2, Wrench, Plus, CheckCircle, AlertTriangle,
+  Wrench, Plus, CheckCircle, AlertTriangle,
   RefreshCw, Calendar,
 } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import StatCard from '../components/ui/StatCard'
+import LoadingState from '../components/ui/LoadingState'
+import EmptyState from '../components/ui/EmptyState'
 import { api } from '../lib/api'
 import { useSiteContext } from '../contexts/SiteContext'
 import toast from 'react-hot-toast'
@@ -32,7 +34,6 @@ export default function MaintenancePage() {
   const [tasks, setTasks] = useState<MaintenanceTaskEntry[]>([])
   const [stats, setStats] = useState<MaintenanceDashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [, setTotal] = useState(0)
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({
     title: '', description: '', category: 'preventive', priority: 'medium',
@@ -54,7 +55,6 @@ export default function MaintenancePage() {
         api.getMaintenanceDashboard(facilityId),
       ])
       setTasks(taskRes.tasks)
-      setTotal(taskRes.total)
       setStats(statsRes)
     } catch (e) {
       console.error(e)
@@ -160,15 +160,13 @@ export default function MaintenancePage() {
       <div className="card">
         <div className="card-body" style={{ padding: 0 }}>
           {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-              <Loader2 size={20} className="spin" />
-            </div>
+            <LoadingState label="Loading tasks..." />
           ) : tasks.length === 0 ? (
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-icon"><Wrench size={24} /></div>
-              <h3>No maintenance tasks</h3>
-              <p>Create a task to get started.</p>
-            </div>
+            <EmptyState
+              icon={<Wrench size={24} />}
+              title="No maintenance tasks"
+              description="Create a task to get started."
+            />
           ) : (
             <table className="data-table">
               <thead>
@@ -213,7 +211,7 @@ export default function MaintenancePage() {
                         color: overdue ? 'var(--danger)' : 'var(--text-secondary)',
                         fontWeight: overdue ? 600 : 400,
                       }}>
-                        {task.due_date ? new Date(task.due_date).toLocaleDateString() : '—'}
+                        {task.due_date ? new Date(task.due_date).toLocaleDateString() : ''}
                         {overdue && ' (overdue)'}
                       </td>
                       <td>
@@ -313,7 +311,7 @@ export default function MaintenancePage() {
                 )}
               </div>
             </div>
-            <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <div className="modal-actions" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn-secondary" onClick={() => setShowCreate(false)}>Cancel</button>
               <button className="btn-primary" onClick={handleCreate} disabled={creating}>
                 {creating ? 'Creating...' : 'Create Task'}

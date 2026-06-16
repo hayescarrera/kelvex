@@ -33,10 +33,10 @@ function friendlyError(err: unknown): string {
 }
 
 export default function Login() {
-  const { login } = useAuth()
+  const { login, homeRoute } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/'
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? null
 
   const [isRegister, setIsRegister] = useState(false)
   const [email, setEmail] = useState('')
@@ -77,7 +77,7 @@ export default function Login() {
         tokens = await api.login(email, password)
       }
       await login(tokens.access_token, tokens.refresh_token, rememberMe)
-      navigate(isRegister ? '/onboarding' : from, { replace: true })
+      navigate(isRegister ? '/onboarding' : (from ?? homeRoute), { replace: true })
     } catch (err) {
       setError(friendlyError(err))
     } finally {
@@ -122,7 +122,7 @@ export default function Login() {
               <div style={styles.featureIcon}><Cpu size={18} /></div>
               <div>
                 <div style={styles.featureTitle}>Works with your equipment</div>
-                <div style={styles.featureDesc}>Danfoss, Copeland, Allen-Bradley — we connect to what you already run</div>
+                <div style={styles.featureDesc}>Modbus and BACnet native — connects to your existing controllers with no equipment replacement</div>
               </div>
             </div>
             <div style={styles.feature}>

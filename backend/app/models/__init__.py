@@ -17,6 +17,16 @@ from app.models.compliance import (
     CriticalControlPoint, ComplianceLog, TempExcursion,
     ComplianceReport, MaintenanceTask, EscalationPolicy, EscalationEvent,
 )
+from app.models.refrigerant import (
+    RefrigerantCircuit, LeakEvent, RefrigerantAdd, RepairRecord,
+)
+from app.models.org_feature import OrgFeature
+from app.models.circuit_forecast import CircuitForecast
+from app.models.system import System
+from app.models.document import Document
+from app.models.tunnel import TunnelSession
+from app.models.maintenance_event import MaintenanceEvent
+from app.models.leak_rate import LeakRateRecord
 
 __all__ = [
     "User",
@@ -61,4 +71,15 @@ __all__ = [
     "MaintenanceTask",
     "EscalationPolicy",
     "EscalationEvent",
+    "RefrigerantCircuit",
+    "LeakEvent",
+    "RefrigerantAdd",
+    "RepairRecord",
+    "OrgFeature",
+    "CircuitForecast",
+    "System",
+    "Document",
+    "TunnelSession",
+    "MaintenanceEvent",
+    "LeakRateRecord",
 ]

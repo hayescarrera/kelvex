@@ -32,10 +32,10 @@ export default function BillsPage() {
   }
 
   const formatCurrency = (val: number) =>
-    val != null ? `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+    val != null ? `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''
 
   const formatNumber = (val: number, decimals = 0) =>
-    val != null ? val.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : '—'
+    val != null ? val.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) : ''
 
   return (
     <div className="stack-lg">

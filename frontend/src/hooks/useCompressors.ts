@@ -79,3 +79,11 @@ export function useHealthCheck(facilityId: string | undefined) {
     onError: (e: Error) => toast.error(e.message),
   })
 }
+
+export function useHealthTrend(facilityId: string | undefined, compressorId: string | undefined, days = 30) {
+  return useQuery({
+    queryKey: ['compressor-health-trend', facilityId, compressorId, days],
+    queryFn: () => api.getHealthTrend(facilityId!, compressorId!, days),
+    enabled: !!facilityId && !!compressorId,
+  })
+}

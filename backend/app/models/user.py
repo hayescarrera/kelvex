@@ -6,62 +6,102 @@ from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
 
 # ── Role definitions ──────────────────────────────
-# Keep in sync with migration 010 and frontend ROLES constant.
-ROLE_OWNER = "owner"
-ROLE_ADMIN = "admin"
+# Keep in sync with migrations and frontend ROLES constant.
+ROLE_KELVEX_ADMIN = "kelvex_admin"   # Internal Kelvex staff — cross-tenant
+ROLE_OWNER = "owner"                  # Account owner / admin
+ROLE_ADMIN = "admin"                  # Account admin
+ROLE_FINANCE = "finance"              # Finance / controller / CFO
+ROLE_OPS_MANAGER = "ops_manager"     # Operations manager (site/regional)
+ROLE_TECHNICIAN = "technician"        # In-house or contract tech
+# Legacy roles — kept for backwards compatibility, not used in new accounts
 ROLE_PLANT_MANAGER = "plant_manager"
-ROLE_TECHNICIAN = "technician"
 ROLE_OPERATOR = "operator"
 ROLE_VIEWER = "viewer"
 
-ALL_ROLES = (ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN, ROLE_OPERATOR, ROLE_VIEWER)
+ALL_ROLES = (
+    ROLE_KELVEX_ADMIN,
+    ROLE_OWNER,
+    ROLE_ADMIN,
+    ROLE_FINANCE,
+    ROLE_OPS_MANAGER,
+    ROLE_TECHNICIAN,
+    ROLE_PLANT_MANAGER,
+    ROLE_OPERATOR,
+    ROLE_VIEWER,
+)
 
 # Roles that automatically see ALL facilities in the org
-GLOBAL_ACCESS_ROLES = {ROLE_OWNER, ROLE_ADMIN}
+GLOBAL_ACCESS_ROLES = {ROLE_KELVEX_ADMIN, ROLE_OWNER, ROLE_ADMIN}
 
 # ── Permission matrix ─────────────────────────────
 # Each key is a permission; the value is the set of roles that have it.
 PERMISSIONS = {
     # Organization management
-    "org:manage":           {ROLE_OWNER},
-    "org:billing":          {ROLE_OWNER, ROLE_ADMIN},
+    "org:manage":              {ROLE_KELVEX_ADMIN, ROLE_OWNER},
+    "org:billing":             {ROLE_KELVEX_ADMIN, ROLE_OWNER, ROLE_ADMIN},
 
     # User management
-    "users:invite":         {ROLE_OWNER, ROLE_ADMIN},
-    "users:edit_role":      {ROLE_OWNER, ROLE_ADMIN},
-    "users:remove":         {ROLE_OWNER, ROLE_ADMIN},
-    "users:view":           {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER},
+    "users:invite":            {ROLE_OWNER, ROLE_ADMIN},
+    "users:edit_role":         {ROLE_OWNER, ROLE_ADMIN},
+    "users:remove":            {ROLE_OWNER, ROLE_ADMIN},
+    "users:view":              {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
 
-    # Facility management
-    "facilities:create":    {ROLE_OWNER, ROLE_ADMIN},
-    "facilities:edit":      {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER},
-    "facilities:delete":    {ROLE_OWNER, ROLE_ADMIN},
-    "facilities:view":      set(ALL_ROLES),
+    # Facility / site management
+    "facilities:create":       {ROLE_KELVEX_ADMIN, ROLE_OWNER, ROLE_ADMIN},
+    "facilities:edit":         {ROLE_KELVEX_ADMIN, ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
+    "facilities:delete":       {ROLE_KELVEX_ADMIN, ROLE_OWNER, ROLE_ADMIN},
+    "facilities:view":         set(ALL_ROLES),
 
-    # Compressor control
-    "control:setpoint":     {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN},
-    "control:start_stop":   {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN, ROLE_OPERATOR},
-    "control:defrost":      {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN, ROLE_OPERATOR},
-    "control:demand_response": {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER},
+    # Tunnel (controller access) — Owner and Technician only per spec
+    "tunnel:access":           {ROLE_KELVEX_ADMIN, ROLE_OWNER, ROLE_ADMIN, ROLE_TECHNICIAN},
+
+    # Refrigerant logging
+    "refrigerant:log":         {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_TECHNICIAN, ROLE_PLANT_MANAGER},
+    "refrigerant:view":        {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_FINANCE, ROLE_TECHNICIAN, ROLE_PLANT_MANAGER},
+
+    # Maintenance
+    "maintenance:log":         {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_TECHNICIAN, ROLE_PLANT_MANAGER},
+    "maintenance:view":        set(ALL_ROLES),
+
+    # Control (tunnel-mediated — v1 never writes direct)
+    "control:setpoint":        {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN},
+    "control:start_stop":      {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN, ROLE_OPERATOR},
+    "control:defrost":         {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN, ROLE_OPERATOR},
+    "control:demand_response": {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
 
     # Automation
-    "automation:create":    {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER},
-    "automation:edit":      {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER},
-    "automation:delete":    {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER},
-    "automation:view":      {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN, ROLE_OPERATOR},
+    "automation:create":       {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
+    "automation:edit":         {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
+    "automation:delete":       {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
+    "automation:view":         {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN, ROLE_OPERATOR},
 
-    # Agents
-    "agents:manage":        {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER},
-    "agents:view":          {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN},
+    # Agents / edge devices
+    "agents:manage":           {ROLE_KELVEX_ADMIN, ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
+    "agents:view":             {ROLE_OWNER, ROLE_ADMIN, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN},
 
     # Settings
-    "settings:edit":        {ROLE_OWNER, ROLE_ADMIN},
-    "settings:view":        set(ALL_ROLES),
+    "settings:edit":           {ROLE_OWNER, ROLE_ADMIN},
+    "settings:view":           set(ALL_ROLES),
 
-    # Energy / billing data
-    "energy:view":          {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER},
-    "bills:manage":         {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER},
-    "bills:view":           {ROLE_OWNER, ROLE_ADMIN, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN},
+    # Energy and cost data
+    "energy:view":             {ROLE_OWNER, ROLE_ADMIN, ROLE_FINANCE, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
+    "bills:manage":            {ROLE_OWNER, ROLE_ADMIN, ROLE_FINANCE, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
+    "bills:view":              {ROLE_OWNER, ROLE_ADMIN, ROLE_FINANCE, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER, ROLE_TECHNICIAN},
+
+    # Documents
+    "documents:manage":        {ROLE_OWNER, ROLE_ADMIN, ROLE_FINANCE, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
+    "documents:view":          set(ALL_ROLES),
+
+    # Reports and exports
+    "reports:generate":        {ROLE_OWNER, ROLE_ADMIN, ROLE_FINANCE, ROLE_OPS_MANAGER, ROLE_PLANT_MANAGER},
+    "reports:view":            set(ALL_ROLES),
+
+    # Audit log
+    "audit:view":              {ROLE_KELVEX_ADMIN, ROLE_OWNER, ROLE_ADMIN},
+
+    # Kelvex-admin-only
+    "kelvex:provision":        {ROLE_KELVEX_ADMIN},
+    "kelvex:impersonate":      {ROLE_KELVEX_ADMIN},
 }
 
 

@@ -200,15 +200,15 @@ export default function SiteComparison() {
                           <td className="cell-primary" style={{ color: CHART_COLORS[idx % CHART_COLORS.length] }}>
                             {name}
                           </td>
-                          <td>{fd ? fd.equipmentCount : '—'}</td>
-                          <td>{fd ? fd.billCount : '—'}</td>
+                          <td>{fd ? fd.equipmentCount : ''}</td>
+                          <td>{fd ? fd.billCount : ''}</td>
                           <td>
                             {fd
                               ? `$${fd.avgMonthlyCost.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                              : '—'}
+                              : ''}
                           </td>
-                          <td>{fd ? `${fd.avgPeakKw.toFixed(1)} kW` : '—'}</td>
-                          <td>{fd ? `${fd.demandPct.toFixed(1)}%` : '—'}</td>
+                          <td>{fd ? `${fd.avgPeakKw.toFixed(1)} kW` : ''}</td>
+                          <td>{fd ? `${fd.demandPct.toFixed(1)}%` : ''}</td>
                         </tr>
                       )
                     })}

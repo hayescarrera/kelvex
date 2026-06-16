@@ -1,12 +1,19 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { AlertTriangle, Bell, CheckCircle, Filter, Loader2, Shield, Clock } from 'lucide-react'
+import { AlertTriangle, Bell, CheckCircle, Filter, Shield, Clock, Wrench } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import StatCard from '../components/ui/StatCard'
+import LoadingState from '../components/ui/LoadingState'
+import EmptyState from '../components/ui/EmptyState'
 import { useSiteContext } from '../contexts/SiteContext'
 import { useAlerts, useAlertSummary, useUpdateAlert } from '../hooks/useAlerts'
+import { api } from '../lib/api'
 import type { Alert } from '../lib/api'
+
+function formatCategory(cat: string) {
+  return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info']
 
@@ -59,6 +66,15 @@ export default function AlertsPage() {
     })
   }
 
+  const handleCreateWorkOrder = async (alertId: string) => {
+    try {
+      const task = await api.createWorkOrderFromAlert(alertId)
+      toast.success(`Work order created: ${task.title}`)
+    } catch {
+      toast.error('Failed to create work order')
+    }
+  }
+
   const formatTime = (val: string) => {
     const d = new Date(val)
     const now = Date.now()
@@ -83,16 +99,28 @@ export default function AlertsPage() {
             <StatCard icon={<CheckCircle size={18} />} color="var(--success)" value={String((summary?.by_severity?.medium ?? 0) + (summary?.by_severity?.low ?? 0))} label="Medium/Low" />
           </div>
           <div className="card" style={{ marginTop: 20 }}>
-            <div className="card-header"><h3>Select a facility to view alerts</h3></div>
-            <div className="card-body">
-              {facilities.map(f => (
-                <div key={f.id} className="setting-row">
-                  <div>
-                    <span className="cell-primary">{f.name}</span>
-                    <span className="cell-secondary">{[f.city, f.state].filter(Boolean).join(', ')}</span>
-                  </div>
-                </div>
-              ))}
+            <div className="card-header">
+              <h3>Showing fleet-wide counts</h3>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                Use the site selector in the sidebar to filter alerts by facility
+              </span>
+            </div>
+            <div className="card-body" style={{ padding: 0 }}>
+              <table className="data-table">
+                <thead>
+                  <tr><th>Facility</th><th>Location</th></tr>
+                </thead>
+                <tbody>
+                  {facilities.map(f => (
+                    <tr key={f.id}>
+                      <td><span className="cell-primary">{f.name}</span></td>
+                      <td style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                        {[f.city, f.state].filter(Boolean).join(', ') || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -113,7 +141,7 @@ export default function AlertsPage() {
         <StatCard icon={<AlertTriangle size={18} />} color="var(--danger)" value={String(summary?.total_active ?? alerts.length)} label="Active" />
         <StatCard icon={<Shield size={18} />} color="var(--warning)" value={String(summary?.by_severity?.critical ?? 0)} label="Critical" />
         <StatCard icon={<Bell size={18} />} color="var(--info)" value={String(summary?.by_severity?.high ?? 0)} label="High" />
-        <StatCard icon={<CheckCircle size={18} />} color="var(--success)" value={String(summary?.by_severity?.low ?? 0)} label="Low" />
+        <StatCard icon={<CheckCircle size={18} />} color="var(--success)" value={String((summary?.by_severity?.medium ?? 0) + (summary?.by_severity?.low ?? 0))} label="Medium / Low" />
       </div>
 
       <div className="content-area">
@@ -152,15 +180,13 @@ export default function AlertsPage() {
           </div>
           <div className="card-body" style={{ padding: 0 }}>
             {isLoading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
-                <Loader2 size={24} className="spin" />
-              </div>
+              <LoadingState label="Loading alerts..." />
             ) : alerts.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon"><CheckCircle size={24} /></div>
-                <h3>All clear</h3>
-                <p>No alerts matching your filters. All systems operating normally.</p>
-              </div>
+              <EmptyState
+                icon={<CheckCircle size={24} />}
+                title="All clear"
+                description="No alerts matching your filters. All systems operating normally."
+              />
             ) : (
               <table className="data-table">
                 <thead>
@@ -185,7 +211,7 @@ export default function AlertsPage() {
                         <span className="cell-primary">{alert.title}</span>
                         {alert.message && <span className="cell-secondary">{alert.message}</span>}
                       </td>
-                      <td style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{alert.category}</td>
+                      <td style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{formatCategory(alert.category)}</td>
                       <td>
                         <span className={`badge ${stateBadge(alert.state)}`}>
                           <span className="badge-dot" /> {alert.state}
@@ -216,6 +242,16 @@ export default function AlertsPage() {
                               disabled={updateAlert.isPending}
                             >
                               Resolve
+                            </button>
+                          )}
+                          {alert.state !== 'resolved' && (alert.severity === 'critical' || alert.severity === 'high') && (
+                            <button
+                              className="btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: 3 }}
+                              onClick={() => handleCreateWorkOrder(alert.id)}
+                              title="Auto-generate maintenance work order from this alert"
+                            >
+                              <Wrench size={10} /> WO
                             </button>
                           )}
                         </div>

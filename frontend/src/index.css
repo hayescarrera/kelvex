@@ -2004,8 +2004,13 @@ input[type="text"]:focus {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+  .card-body:has(.data-table) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   .data-table {
     font-size: 12px;
+    min-width: 480px;
   }
   .data-table th,
   .data-table td {
@@ -2063,5 +2068,18 @@ input[type="text"]:focus {
   }
   .page-container {
     padding: 12px 10px 32px;
+  }
+  .hidden-mobile {
+    display: none !important;
+  }
+  .dashboard-grid {
+    gap: 12px;
+  }
+  .card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .card-header h3 {
+    font-size: 13px;
   }
 }

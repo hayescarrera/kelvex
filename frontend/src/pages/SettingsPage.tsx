@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Sun, Moon, User, Bell, Shield, Database, Key, AlertTriangle, Check, Loader2, Download, Plus, Trash2, Play, Mail, Globe, MessageSquare, Phone, X, Clock, Users } from 'lucide-react'
+import { Sun, Moon, User, Bell, Shield, Database, Key, AlertTriangle, Check, Loader2, Download, Plus, Trash2, Play, Mail, Globe, MessageSquare, Phone, X, Clock, Users, Activity } from 'lucide-react'
+import type { DetectionSettings } from '../lib/api'
 import toast from 'react-hot-toast'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -29,6 +30,39 @@ export default function SettingsPage() {
   const [fullName, setFullName] = useState(user?.full_name ?? '')
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
+
+  // Detection settings state
+  const [detectionSettings, setDetectionSettings] = useState<DetectionSettings>({ auto_detection: false, forecasting: false })
+  const [detectionLoading, setDetectionLoading] = useState(false)
+  const [detectionSaving, setDetectionSaving] = useState(false)
+  const canManageDetection = user?.role === 'owner' || user?.role === 'admin'
+
+  useEffect(() => {
+    if (activeSection === 'detection') {
+      setDetectionLoading(true)
+      api.getDetectionSettings()
+        .then(s => setDetectionSettings(s))
+        .catch(() => {})
+        .finally(() => setDetectionLoading(false))
+    }
+  }, [activeSection])
+
+  async function toggleDetectionFeature(key: keyof DetectionSettings) {
+    if (!canManageDetection) return
+    const next = { ...detectionSettings, [key]: !detectionSettings[key] }
+    setDetectionSettings(next)
+    setDetectionSaving(true)
+    try {
+      const saved = await api.updateDetectionSettings({ [key]: next[key] })
+      setDetectionSettings(saved)
+      toast.success(next[key] ? 'Enabled' : 'Disabled')
+    } catch {
+      setDetectionSettings(detectionSettings)
+      toast.error('Failed to save')
+    } finally {
+      setDetectionSaving(false)
+    }
+  }
 
   // Temperature unit — persisted in localStorage
   const [tempUnit, setTempUnit] = useState<TempUnit>(() =>
@@ -124,6 +158,8 @@ export default function SettingsPage() {
     { id: 'profile', label: 'Profile', icon: <User size={15} /> },
     { id: 'appearance', label: 'Appearance', icon: <Sun size={15} /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell size={15} /> },
+    { id: 'digest', label: 'Digest Preview', icon: <Mail size={15} /> },
+    { id: 'detection', label: 'Detection', icon: <Activity size={15} /> },
     { id: 'team', label: 'Team', icon: <Users size={15} /> },
     { id: 'security', label: 'Security', icon: <Shield size={15} /> },
     { id: 'data', label: 'Data & Export', icon: <Database size={15} /> },
@@ -440,6 +476,106 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {activeSection === 'detection' && (
+            <div className="stack-lg">
+              {detectionLoading ? (
+                <div className="card"><div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-muted)' }}><Loader2 size={16} className="spin" /> Loading...</div></div>
+              ) : (
+                <>
+                  {/* Auto Detection */}
+                  <div className="card">
+                    <div className="card-header">
+                      <div>
+                        <h3 style={{ margin: 0 }}>Automated Leak Detection</h3>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                          Kelvex analyzes suction pressure trends, superheat readings, and refrigerant add patterns to automatically detect leaks — no manual logging required to trigger an alert.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => toggleDetectionFeature('auto_detection')}
+                        disabled={!canManageDetection || detectionSaving}
+                        style={{
+                          width: 44, height: 24, borderRadius: 12, border: 'none', cursor: canManageDetection ? 'pointer' : 'not-allowed',
+                          background: detectionSettings.auto_detection ? 'var(--accent)' : 'var(--border)',
+                          position: 'relative', transition: 'background 200ms', flexShrink: 0,
+                        }}
+                        title={canManageDetection ? undefined : 'Admin or Owner required'}
+                      >
+                        <span style={{
+                          position: 'absolute', top: 3, left: detectionSettings.auto_detection ? 22 : 3,
+                          width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                          transition: 'left 200ms', display: 'block', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }} />
+                      </button>
+                    </div>
+                    <div className="card-body" style={{ paddingTop: 0 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                        {[
+                          { label: 'Pressure trend analysis', desc: 'EWMA on suction pressure — flags sustained drops over 72-hour windows' },
+                          { label: 'Superheat corroboration', desc: 'Cross-checks pressure drift against superheat rise for higher confidence' },
+                          { label: 'Add pattern anomaly', desc: 'Poisson rate test on refrigerant add frequency vs. historical baseline' },
+                        ].map(f => (
+                          <div key={f.label} style={{ padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--accent)' }}>
+                            <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 3 }}>{f.label}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{f.desc}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {!canManageDetection && (
+                        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12 }}>Admin or Owner role required to change this setting.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Forecasting */}
+                  <div className="card">
+                    <div className="card-header">
+                      <div>
+                        <h3 style={{ margin: 0 }}>Consumption Forecasting</h3>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                          Projects refrigerant consumption 90 days forward per circuit. Shows days to AIM Act warning and threshold, and flags circuits trending toward exceedance before it happens.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => toggleDetectionFeature('forecasting')}
+                        disabled={!canManageDetection || detectionSaving}
+                        style={{
+                          width: 44, height: 24, borderRadius: 12, border: 'none', cursor: canManageDetection ? 'pointer' : 'not-allowed',
+                          background: detectionSettings.forecasting ? 'var(--accent)' : 'var(--border)',
+                          position: 'relative', transition: 'background 200ms', flexShrink: 0,
+                        }}
+                        title={canManageDetection ? undefined : 'Admin or Owner required'}
+                      >
+                        <span style={{
+                          position: 'absolute', top: 3, left: detectionSettings.forecasting ? 22 : 3,
+                          width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                          transition: 'left 200ms', display: 'block', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }} />
+                      </button>
+                    </div>
+                    <div className="card-body" style={{ paddingTop: 0 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                        {[
+                          { label: 'Linear regression', desc: 'Used for circuits with fewer than 6 months of add history — honest about uncertainty' },
+                          { label: 'Exponential smoothing', desc: 'Holt-Winters model for circuits with 6+ months of data — adapts to seasonal patterns' },
+                          { label: 'Confidence intervals', desc: 'Bootstrap CI for sparse data; statistical PI for richer history — shows low/high range' },
+                        ].map(f => (
+                          <div key={f.label} style={{ padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--success)' }}>
+                            <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 3 }}>{f.label}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{f.desc}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12 }}>
+                        Forecasts run daily and appear in the AIM Act tab on the Leak Tracking page. Circuits need at least 3 refrigerant adds before forecasting starts.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {activeSection === 'team' && (
             <div className="card">
               <div className="card-body" style={{ textAlign: 'center', padding: 40 }}>
@@ -451,6 +587,10 @@ export default function SettingsPage() {
                 </a>
               </div>
             </div>
+          )}
+
+          {activeSection === 'digest' && (
+            <DigestPreviewSection />
           )}
 
           {activeSection === 'security' && (
@@ -578,6 +718,117 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+import { useCallback } from 'react'
+import type { DigestPreview } from '../lib/api'
+
+function DigestPreviewSection() {
+  const [preview, setPreview] = useState<DigestPreview | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [hours, setHours] = useState(24)
+
+  const sevColors: Record<string, string> = {
+    critical: 'var(--danger)', high: '#e67700', medium: 'var(--warning)',
+    low: 'var(--info)', info: 'var(--text-secondary)',
+  }
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await api.getDigestPreview(hours)
+      setPreview(data)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [hours])
+
+  useEffect(() => { load() }, [load])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="card">
+        <div className="card-header"><h3>Email Digest Preview</h3></div>
+        <div className="card-body">
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            {[12, 24, 48, 168].map(h => (
+              <button
+                key={h}
+                onClick={() => setHours(h)}
+                className={hours === h ? 'btn-primary' : 'btn-secondary'}
+                style={{ padding: '5px 12px', fontSize: 12 }}
+              >
+                {h < 48 ? `${h}h` : `${h / 24}d`}
+              </button>
+            ))}
+          </div>
+
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 32 }}><Loader2 size={22} className="spin" /></div>
+          ) : preview ? (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div style={{ padding: 16, background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                  <h4 style={{ margin: '0 0 10px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <AlertTriangle size={14} /> Alerts
+                  </h4>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: preview.alerts.new_total > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                    {preview.alerts.new_total}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>new active alerts</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {Object.entries(preview.alerts.active_by_severity).map(([sev, count]) => (
+                      count > 0 && (
+                        <div key={sev} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: sevColors[sev] || '#888' }} />
+                            {sev}
+                          </span>
+                          <span style={{ fontWeight: 600 }}>{count}</span>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </div>
+                <div style={{ padding: 16, background: 'var(--bg-secondary)', borderRadius: 8 }}>
+                  <h4 style={{ margin: '0 0 10px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Activity size={14} /> Control Actions
+                  </h4>
+                  <div style={{ fontSize: 28, fontWeight: 700 }}>{preview.commands.total}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>commands issued</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Completed</span>
+                      <span style={{ fontWeight: 600, color: 'var(--success)' }}>{preview.commands.completed}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Failed</span>
+                      <span style={{ fontWeight: 600, color: 'var(--danger)' }}>{preview.commands.failed}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Automation fires</span>
+                      <span style={{ fontWeight: 600 }}>{preview.automation.rule_fires_today}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Covering {preview.facilities_count} facilit{preview.facilities_count === 1 ? 'y' : 'ies'}:{' '}
+                {preview.facilities.map(f => f.name).join(', ')}
+              </div>
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Shield size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            Sent daily at 7:00 UTC to all enabled notification channels. Configure channels in Notifications above.
           </div>
         </div>
       </div>

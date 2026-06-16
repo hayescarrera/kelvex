@@ -193,19 +193,19 @@ export default function EquipmentPage() {
                       <span className="cell-primary">{eq.name}</span>
                     </td>
                     <td>
-                      <span className="badge badge-info">{eq.equipment_type ?? '—'}</span>
+                      <span className="badge badge-info">{eq.equipment_type ?? ''}</span>
                     </td>
                     <td>
-                      <span className="cell-secondary">{eq.manufacturer ?? '—'}</span>
+                      <span className="cell-secondary">{eq.manufacturer ?? ''}</span>
                     </td>
                     <td>
-                      <span className="cell-secondary">{eq.model ?? '—'}</span>
+                      <span className="cell-secondary">{eq.model ?? ''}</span>
                     </td>
                     <td>
                       <span className="cell-secondary">
                         {eq.created_at
                           ? new Date(eq.created_at).toLocaleDateString()
-                          : '—'}
+                          : ''}
                       </span>
                     </td>
                     <td>

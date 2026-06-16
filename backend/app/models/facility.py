@@ -4,6 +4,10 @@ from sqlalchemy import String, Float, ForeignKey, DateTime, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from app.core.database import Base
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.system import System
 
 
 class Facility(Base):
@@ -77,10 +81,14 @@ class Equipment(Base):
     facility_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("facilities.id"), nullable=False
     )
+    # Optional grouping under a System (rack/circuit/walk-in)
+    system_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("systems.id", ondelete="SET NULL"), nullable=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     equipment_type: Mapped[str] = mapped_column(
         String(100), nullable=False
-    )  # compressor, evaporator, condenser, etc.
+    )  # compressor, evaporator, condenser, case, walk_in, blast_freezer, etc.
     manufacturer: Mapped[str] = mapped_column(String(100), nullable=True)
     model: Mapped[str] = mapped_column(String(100), nullable=True)
     controller_type: Mapped[str] = mapped_column(
@@ -89,6 +97,12 @@ class Equipment(Base):
     protocol: Mapped[str] = mapped_column(
         String(50), nullable=True
     )  # bacnet, modbus, ethernet_ip
+
+    # Refrigerant tracking — required for AIM Act leak-rate thresholds
+    refrigerant_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gwp: Mapped[float | None] = mapped_column(Float, nullable=True)  # Global Warming Potential
+    full_charge_lbs: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     commissioned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, nullable=True, default=dict)
     created_at: Mapped[datetime] = mapped_column(
@@ -97,6 +111,9 @@ class Equipment(Base):
 
     # Relationships
     facility: Mapped["Facility"] = relationship(back_populates="equipment")
+    system: Mapped["System | None"] = relationship(  # type: ignore[name-defined]
+        back_populates="equipment", foreign_keys=[system_id]
+    )
 
     def __repr__(self):
         return f"<Equipment {self.name} ({self.equipment_type})>"
@@ -108,3 +125,4 @@ from app.models.tariff import RateSchedule  # noqa: E402, F401
 from app.models.billing import UtilityBill, DemandAnalysis  # noqa: E402, F401
 from app.models.zone import Zone  # noqa: E402, F401
 from app.models.compressor import Compressor  # noqa: E402, F401
+from app.models.system import System  # noqa: E402, F401

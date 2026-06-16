@@ -634,6 +634,123 @@ async def get_control_capabilities(
     }
 
 
+# ── Command Queue Management ──────────────────────────
+
+@router.get("/commands")
+async def list_plant_commands(
+    facility_id: _uuid.UUID,
+    state: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List recent plant control commands with optional state filter."""
+    await _get_facility(facility_id, current_user, db)
+    query = select(CommandQueue).where(CommandQueue.facility_id == facility_id)
+    if state:
+        query = query.where(CommandQueue.state == state)
+    result = await db.execute(query.order_by(desc(CommandQueue.issued_at)).limit(limit))
+    commands = result.scalars().all()
+    return {
+        "commands": [
+            {
+                "id": str(c.id),
+                "command_type": c.command_type,
+                "parameters": c.parameters,
+                "state": c.state,
+                "priority": c.priority,
+                "source": getattr(c, "source", "user"),
+                "issued_at": c.issued_at.isoformat() if c.issued_at else None,
+                "completed_at": c.completed_at.isoformat() if c.completed_at else None,
+                "error_message": c.error_message,
+            }
+            for c in commands
+        ],
+        "total": len(commands),
+    }
+
+
+@router.post("/commands/{command_id}/cancel")
+async def cancel_plant_command(
+    facility_id: _uuid.UUID,
+    command_id: _uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel a pending or pending_approval command before it reaches the edge agent."""
+    await _get_facility(facility_id, current_user, db)
+
+    result = await db.execute(
+        select(CommandQueue).where(
+            CommandQueue.id == command_id,
+            CommandQueue.facility_id == facility_id,
+        )
+    )
+    cmd = result.scalar_one_or_none()
+    if not cmd:
+        raise HTTPException(status_code=404, detail="Command not found")
+    if cmd.state not in ("pending", "pending_approval"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot cancel command in state '{cmd.state}' — only pending or pending_approval commands can be cancelled",
+        )
+
+    cmd.state = "cancelled"
+    cmd.completed_at = datetime.now(timezone.utc)
+    await db.flush()
+
+    await _audit(
+        db, facility_id, current_user.id,
+        "cancel_command", "command", cmd.id,
+        cmd.parameters.get("compressor_name") or cmd.parameters.get("zone_name") or "command",
+        {"command_type": cmd.command_type, "cancelled_state": "pending"},
+        cmd.id,
+    )
+    await db.flush()
+
+    return {"status": "cancelled", "command_id": str(cmd.id)}
+
+
+@router.post("/commands/{command_id}/approve")
+async def approve_plant_command(
+    facility_id: _uuid.UUID,
+    command_id: _uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Approve a pending_approval command, releasing it for execution by the edge agent."""
+    await _get_facility(facility_id, current_user, db)
+
+    result = await db.execute(
+        select(CommandQueue).where(
+            CommandQueue.id == command_id,
+            CommandQueue.facility_id == facility_id,
+        )
+    )
+    cmd = result.scalar_one_or_none()
+    if not cmd:
+        raise HTTPException(status_code=404, detail="Command not found")
+    if cmd.state != "pending_approval":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Command is in state '{cmd.state}', not pending_approval",
+        )
+
+    cmd.state = "pending"
+    await db.flush()
+
+    await _audit(
+        db, facility_id, current_user.id,
+        "approve_command", "command", cmd.id,
+        cmd.parameters.get("compressor_name") or cmd.parameters.get("zone_name") or "command",
+        {"command_type": cmd.command_type},
+        cmd.id,
+    )
+    await db.flush()
+
+    return {"status": "approved", "command_id": str(cmd.id)}
+
+
 # ── Audit Log ─────────────────────────────────────────
 
 @router.get("/audit-log")

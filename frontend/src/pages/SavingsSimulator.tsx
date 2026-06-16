@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Calculator, TrendingDown, Loader2, DollarSign } from 'lucide-react'
+import { Calculator, TrendingDown, DollarSign, Droplets, Info } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import StatCard from '../components/ui/StatCard'
+import LoadingState from '../components/ui/LoadingState'
 import { useSiteContext } from '../contexts/SiteContext'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
@@ -50,6 +51,12 @@ export default function SavingsSimulator() {
 
   const bills = billData?.bills ?? []
 
+  const { data: reportData, isLoading: reportLoading, isError: reportError } = useQuery({
+    queryKey: ['savings-report', selectedFacility],
+    queryFn: () => api.getSavingsReport(selectedFacility),
+    enabled: !!selectedFacility,
+  })
+
   // Calculate annual costs from bills
   const annualDemandCost = bills.reduce((sum, b) => sum + Number(b.demand_charge || 0), 0)
   const annualTotalCost = bills.reduce((sum, b) => sum + Number(b.total_cost || 0), 0)
@@ -88,11 +95,7 @@ export default function SavingsSimulator() {
         </select>
       </div>
 
-      {isLoading && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
-          <Loader2 size={24} className="spin" />
-        </div>
-      )}
+      {isLoading && <LoadingState />}
 
       {!isLoading && selectedFacility && (
         <>
@@ -147,6 +150,84 @@ export default function SavingsSimulator() {
               ))}
             </div>
           )}
+
+          {/* ── Quantified Savings Report ──────────────────────── */}
+          <div className="card" style={{ marginTop: 24 }}>
+            <div className="card-header">
+              <div>
+                <h3 style={{ margin: 0 }}>Quantified Savings Report</h3>
+                {reportData && (
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {reportData.report_period.start} → {reportData.report_period.end}
+                  </span>
+                )}
+              </div>
+              {reportData && (
+                <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--success)' }}>
+                  ${reportData.total_quantified_savings.toLocaleString(undefined, { maximumFractionDigits: 0 })} total impact
+                </span>
+              )}
+            </div>
+            <div className="card-body">
+              {reportLoading && <LoadingState />}
+              {reportError && (
+                <p style={{ color: 'var(--danger)', fontSize: 13 }}>Unable to load savings report.</p>
+              )}
+              {reportData && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                    <div style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)' }}>
+                        <TrendingDown size={13} /> Energy Optimization
+                      </div>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}>
+                        ${reportData.energy_savings.total_est.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                        {reportData.energy_savings.demand_reduction_pct}% demand reduction + {reportData.energy_savings.energy_reduction_pct}% energy reduction
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                        Based on {reportData.energy_savings.bills_analyzed} bills · ${reportData.energy_savings.annual_bill_total.toLocaleString(undefined, { maximumFractionDigits: 0 })} annual spend
+                      </div>
+                    </div>
+                    <div style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)' }}>
+                        <Droplets size={13} /> Refrigerant Leak Prevention
+                      </div>
+                      <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--accent)' }}>
+                        ${reportData.refrigerant_savings.total_refrigerant_impact.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                        {reportData.refrigerant_savings.total_lbs_added_12m.toFixed(0)} lbs added · {reportData.refrigerant_savings.charge_deficit_pct.toFixed(1)}% charge deficit
+                      </div>
+                      {reportData.refrigerant_savings.energy_penalty_pct > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--warning)', marginTop: 4 }}>
+                          +{reportData.refrigerant_savings.energy_penalty_pct.toFixed(1)}% energy penalty from undercharge (ASHRAE)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Methodology */}
+                  <details style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    <summary style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, userSelect: 'none' }}>
+                      <Info size={12} /> View methodology & citations
+                    </summary>
+                    <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
+                      {Object.entries(reportData.methodology).map(([k, v]) => (
+                        <div key={k} style={{ padding: '8px 10px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)' }}>
+                          <div style={{ fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2, color: 'var(--text-secondary)' }}>
+                            {k.replace(/_/g, ' ')}
+                          </div>
+                          {v}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                </>
+              )}
+            </div>
+          </div>
         </>
       )}
 

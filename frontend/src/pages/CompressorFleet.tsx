@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Activity, Plus, X, Heart, AlertTriangle, Zap,
-  RefreshCw,
+  RefreshCw, TrendingDown, Calendar,
 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -15,7 +15,7 @@ import ChartTooltip from '../components/ui/ChartTooltip'
 import { useSiteContext } from '../contexts/SiteContext'
 import {
   useCompressorSummary, useCompressorReadings, useCreateCompressor,
-  useHealthCheck,
+  useHealthCheck, useHealthTrend,
 } from '../hooks/useCompressors'
 import type { CompressorHealthSummary } from '../lib/api'
 
@@ -47,7 +47,7 @@ export default function CompressorFleet() {
           <StatCard
             icon={<Heart size={18} />}
             color={!summary.avg_health_score ? 'var(--text-muted)' : summary.avg_health_score >= 70 ? 'var(--success)' : summary.avg_health_score >= 40 ? 'var(--warning)' : 'var(--danger)'}
-            value={summary.avg_health_score ? `${summary.avg_health_score}` : '—'}
+            value={summary.avg_health_score ? `${summary.avg_health_score}` : ''}
             label="Avg Health Score"
           />
         </div>
@@ -153,7 +153,7 @@ function CompressorCard({ comp, facilityId, isSelected, onSelect }: {
             }} />
           </div>
           <span style={{ fontSize: 12, fontWeight: 600, color: healthColor, minWidth: 30, textAlign: 'right' }}>
-            {comp.health_score ?? '—'}
+            {comp.health_score ?? ''}
           </span>
         </div>
 
@@ -161,31 +161,31 @@ function CompressorCard({ comp, facilityId, isSelected, onSelect }: {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, fontSize: 11 }}>
           <div>
             <div className="text-muted">Discharge</div>
-            <div style={{ fontWeight: 600 }}>{comp.discharge_pressure_psi?.toFixed(0) ?? '—'} psi</div>
+            <div style={{ fontWeight: 600 }}>{comp.discharge_pressure_psi?.toFixed(0) ?? ''} psi</div>
           </div>
           <div>
             <div className="text-muted">Suction</div>
-            <div style={{ fontWeight: 600 }}>{comp.suction_pressure_psi?.toFixed(0) ?? '—'} psi</div>
+            <div style={{ fontWeight: 600 }}>{comp.suction_pressure_psi?.toFixed(0) ?? ''} psi</div>
           </div>
           <div>
             <div className="text-muted">Oil Temp</div>
-            <div style={{ fontWeight: 600 }}>{comp.oil_temp_f?.toFixed(0) ?? '—'}°F</div>
+            <div style={{ fontWeight: 600 }}>{comp.oil_temp_f?.toFixed(0) ?? ''}°F</div>
           </div>
           <div>
             <div className="text-muted">Bearing</div>
             <div style={{ fontWeight: 600, color: comp.anomalies.some(a => a.includes('bearing') || a.includes('Bearing')) ? 'var(--danger)' : undefined }}>
-              {comp.bearing_temp_f?.toFixed(0) ?? '—'}°F
+              {comp.bearing_temp_f?.toFixed(0) ?? ''}°F
             </div>
           </div>
           <div>
             <div className="text-muted">Vibration</div>
             <div style={{ fontWeight: 600, color: comp.anomalies.some(a => a.includes('ibration')) ? 'var(--danger)' : undefined }}>
-              {comp.vibration_ips?.toFixed(3) ?? '—'} in/s
+              {comp.vibration_ips?.toFixed(3) ?? ''} in/s
             </div>
           </div>
           <div>
             <div className="text-muted">Load</div>
-            <div style={{ fontWeight: 600 }}>{comp.slide_valve_pct?.toFixed(0) ?? '—'}%</div>
+            <div style={{ fontWeight: 600 }}>{comp.slide_valve_pct?.toFixed(0) ?? ''}%</div>
           </div>
         </div>
 
@@ -206,6 +206,7 @@ function CompressorDetail({ facilityId, compressorId, onClose }: {
   facilityId: string; compressorId: string; onClose: () => void
 }) {
   const { data, isLoading } = useCompressorReadings(facilityId, compressorId, 24)
+  const { data: trend } = useHealthTrend(facilityId, compressorId)
 
   const chartData = (data?.readings ?? []).map(r => ({
     time: new Date(r.recorded_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -217,12 +218,52 @@ function CompressorDetail({ facilityId, compressorId, onClose }: {
     kw: r.kw,
   }))
 
+  const urgencyColor = {
+    immediate: 'var(--danger)',
+    soon: 'var(--warning)',
+    monitor: 'var(--accent)',
+    healthy: 'var(--success)',
+  }[trend?.maintenance_urgency ?? 'healthy']
+
   return (
     <div className="card" style={{ marginTop: 16 }}>
       <div className="card-header">
         <h3>24-Hour Telemetry</h3>
         <button className="icon-btn" onClick={onClose}><X size={16} /></button>
       </div>
+
+      {/* Maintenance forecast banner */}
+      {trend && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 16px', borderBottom: '1px solid var(--border)',
+          background: `color-mix(in srgb, ${urgencyColor} 8%, transparent)`,
+        }}>
+          {trend.maintenance_urgency === 'immediate' || trend.maintenance_urgency === 'soon'
+            ? <TrendingDown size={14} style={{ color: urgencyColor }} />
+            : <Calendar size={14} style={{ color: urgencyColor }} />
+          }
+          <div style={{ flex: 1, fontSize: 12 }}>
+            <strong style={{ color: urgencyColor }}>
+              {trend.maintenance_urgency === 'immediate' && 'Immediate intervention needed'}
+              {trend.maintenance_urgency === 'soon' && `Maintenance recommended within ${trend.days_to_maintenance_threshold} days`}
+              {trend.maintenance_urgency === 'monitor' && `Maintenance projected in ~${trend.days_to_maintenance_threshold} days`}
+              {trend.maintenance_urgency === 'healthy' && 'Health trending healthy'}
+            </strong>
+            {trend.projected_maintenance_date && (
+              <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>
+                Threshold by {trend.projected_maintenance_date}
+              </span>
+            )}
+            {trend.trend_slope_per_day !== null && (
+              <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: 11 }}>
+                ({trend.trend_slope_per_day > 0 ? '+' : ''}{trend.trend_slope_per_day?.toFixed(2)} pts/day)
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="card-body">
         {isLoading ? <LoadingState /> : chartData.length === 0 ? (
           <p className="text-muted" style={{ textAlign: 'center', padding: 20 }}>No readings in the last 24 hours</p>

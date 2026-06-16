@@ -16,6 +16,9 @@ async_session = async_sessionmaker(
     expire_on_commit=False,
 )
 
+# Alias used by Celery workers (cannot use get_db which requires a request context)
+AsyncSessionLocal = async_session
+
 
 class Base(DeclarativeBase):
     pass

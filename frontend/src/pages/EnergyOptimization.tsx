@@ -1,11 +1,12 @@
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Zap, DollarSign, TrendingDown, Clock, Sun, Moon, AlertTriangle, Gauge,
-  Thermometer, Target,
+  Thermometer, Target, Activity, BarChart3, Loader2,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell,
+  Cell, AreaChart, Area,
 } from 'recharts'
 import PageHeader from '../components/ui/PageHeader'
 import StatCard from '../components/ui/StatCard'
@@ -14,6 +15,121 @@ import EmptyState from '../components/ui/EmptyState'
 import ChartTooltip from '../components/ui/ChartTooltip'
 import { useSiteContext } from '../contexts/SiteContext'
 import { usePrecoolSchedule, useDemandForecast, useSavingsProjection } from '../hooks/useEnergy'
+import { api } from '../lib/api'
+import type { PowerReport, PowerSummary, EquipmentPowerBreakdown } from '../lib/api'
+
+const POWER_RANGES = [
+  { value: '1d', label: 'Last 24h', days: 1, interval: '1h' },
+  { value: '7d', label: 'Last 7 days', days: 7, interval: '1h' },
+  { value: '30d', label: 'Last 30 days', days: 30, interval: '1d' },
+  { value: '90d', label: 'Last 90 days', days: 90, interval: '1d' },
+]
+
+function PowerHistoryTab({ facilityId }: { facilityId: string }) {
+  const [range, setRange] = useState('7d')
+  const [report, setReport] = useState<PowerReport | null>(null)
+  const [summary, setSummary] = useState<PowerSummary | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const r = POWER_RANGES.find(r => r.value === range) || POWER_RANGES[1]
+    const end = new Date().toISOString()
+    const start = new Date(Date.now() - r.days * 86400000).toISOString()
+    try {
+      const [pwr, sum] = await Promise.all([
+        api.getPowerReport(facilityId, { start, end, interval: r.interval }),
+        api.getPowerSummary(facilityId, r.days),
+      ])
+      setReport(pwr)
+      setSummary(sum)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [facilityId, range])
+
+  useEffect(() => { load() }, [load])
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 40 }}><Loader2 size={24} className="spin" /></div>
+
+  const chartData = (report?.data_points || []).map(d => ({
+    ...d,
+    time: new Date(d.time).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+  }))
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {POWER_RANGES.map(r => (
+          <button
+            key={r.value}
+            onClick={() => setRange(r.value)}
+            className={range === r.value ? 'btn-primary' : 'btn-secondary'}
+            style={{ padding: '5px 12px', fontSize: 12 }}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="stat-grid stagger">
+        <StatCard icon={<Zap size={18} />} color="var(--accent)" value={`${report?.total_kwh?.toLocaleString() || 0} kWh`} label="Total Energy" />
+        <StatCard icon={<Activity size={18} />} color="var(--danger)" value={`${report?.peak_demand_kw || 0} kW`} label="Peak Demand" />
+        <StatCard icon={<BarChart3 size={18} />} color="var(--success)" value={`${summary?.avg_kw || 0} kW`} label="Avg Demand" />
+      </div>
+
+      {chartData.length > 0 ? (
+        <div className="card">
+          <div className="card-header"><h3>Power Consumption</h3></div>
+          <div className="card-body" style={{ height: 300 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="time" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={{ background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }} />
+                <Area type="monotone" dataKey="avg_kw" name="Avg kW" stroke="var(--accent)" fill="var(--accent)" fillOpacity={0.15} />
+                <Area type="monotone" dataKey="peak_kw" name="Peak kW" stroke="var(--danger)" fill="var(--danger)" fillOpacity={0.08} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      ) : (
+        <EmptyState icon={<Zap size={24} />} title="No power data" description="No telemetry readings with kw_demand metric found for this time range." />
+      )}
+
+      {summary?.equipment_breakdown && summary.equipment_breakdown.length > 0 && (
+        <div className="card">
+          <div className="card-header"><h3>Equipment Breakdown</h3></div>
+          <div className="card-body" style={{ padding: 0 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Equipment</th>
+                  <th>Type</th>
+                  <th style={{ textAlign: 'right' }}>Avg kW</th>
+                  <th style={{ textAlign: 'right' }}>Peak kW</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.equipment_breakdown.map((eq: EquipmentPowerBreakdown) => (
+                  <tr key={eq.equipment_id}>
+                    <td className="cell-primary">{eq.name}</td>
+                    <td className="cell-secondary">{eq.equipment_type}</td>
+                    <td style={{ textAlign: 'right' }}>{eq.avg_kw}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{eq.peak_kw}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const PERIOD_COLORS: Record<string, string> = {
   on_peak: '#ef4444',
@@ -27,21 +143,44 @@ export default function EnergyOptimization() {
   const { facilityId } = useParams<{ facilityId: string }>()
   const { facilities } = useSiteContext()
   const facility = facilities.find(f => f.id === facilityId)
+  const [tab, setTab] = useState<'optimization' | 'history'>('optimization')
 
   const { data: precool, isLoading: precoolLoading } = usePrecoolSchedule(facilityId)
   const { data: forecast, isLoading: forecastLoading } = useDemandForecast(facilityId)
   const { data: savings, isLoading: savingsLoading } = useSavingsProjection(facilityId)
 
-  const isLoading = precoolLoading || forecastLoading || savingsLoading
+  const isLoading = tab === 'optimization' && (precoolLoading || forecastLoading || savingsLoading)
 
   if (isLoading) return <LoadingState />
 
   return (
     <div>
       <PageHeader
-        title="Energy Optimization"
+        title="Energy"
         subtitle={facility ? `${facility.name} — Load Shifting & Demand Management` : 'Load Shifting & Demand Management'}
       />
+
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20, marginTop: 4 }}>
+        {(['optimization', 'history'] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            style={{
+              padding: '8px 16px', fontSize: 13, fontWeight: tab === t ? 600 : 400,
+              color: tab === t ? 'var(--accent)' : 'var(--text-secondary)',
+              borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent',
+              background: 'none', border: 'none', cursor: 'pointer', marginBottom: -1,
+            }}
+          >
+            {t === 'optimization' ? 'Optimization' : 'Power History'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'history' && facilityId && <PowerHistoryTab facilityId={facilityId} />}
+      {tab === 'optimization' && (
+      <>
 
       {/* Top stats */}
       {savings && !('error' in savings) && (
@@ -61,13 +200,13 @@ export default function EnergyOptimization() {
           <StatCard
             icon={<Gauge size={18} />}
             color="var(--warning)"
-            value={savings.current_costs.avg_peak_kw ? `${Math.round(savings.current_costs.avg_peak_kw)} kW` : '—'}
+            value={savings.current_costs.avg_peak_kw ? `${Math.round(savings.current_costs.avg_peak_kw)} kW` : ''}
             label="Avg Peak Demand"
           />
           <StatCard
             icon={<Zap size={18} />}
             color="var(--accent)"
-            value={savings.plant_capacity.total_hp ? `${savings.plant_capacity.total_hp} HP` : '—'}
+            value={savings.plant_capacity.total_hp ? `${savings.plant_capacity.total_hp} HP` : ''}
             label="Plant Capacity"
           />
         </div>
@@ -140,7 +279,7 @@ export default function EnergyOptimization() {
                         <Sun size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
                         {precool.coast_window.hours.length > 0
                           ? `${Math.min(...precool.coast_window.hours)}:00 — ${Math.max(...precool.coast_window.hours) + 1}:00`
-                          : '—'}
+                          : ''}
                       </div>
                     </div>
                   </div>
@@ -363,6 +502,8 @@ export default function EnergyOptimization() {
           title="Energy optimization requires data"
           description="Upload utility bills and assign a rate schedule to this facility to see load shifting recommendations, demand forecasts, and savings projections."
         />
+      )}
+      </>
       )}
     </div>
   )

@@ -194,8 +194,11 @@ class CommandQueue(Base):
     # State
     state: Mapped[str] = mapped_column(
         String(20), default="pending"
-    )  # pending, sent, acknowledged, completed, failed, expired
+    )  # pending, pending_approval, sent, acknowledged, completed, failed, expired, cancelled
     priority: Mapped[int] = mapped_column(Integer, default=50)
+    source: Mapped[str] = mapped_column(
+        String(50), default="user"
+    )  # user, automation, schedule, system
     # Execution
     issued_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True

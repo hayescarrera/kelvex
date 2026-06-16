@@ -355,6 +355,127 @@ async def trigger_health_check(
     }
 
 
+# ── Health trend & maintenance forecast ──────────
+
+@router.get("/{compressor_id}/health-trend")
+async def get_health_trend(
+    facility_id: UUID,
+    compressor_id: UUID,
+    days: int = Query(30, ge=7, le=90),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Return daily health score snapshots for the past N days, plus a linear
+    trend projection for when maintenance intervention is recommended.
+
+    Uses raw readings to compute daily health proxies. The maintenance threshold
+    is 70/100 — below that, intervention is recommended before failure.
+    """
+    import math
+    await _get_facility(facility_id, current_user, db)
+    comp = await _get_compressor(compressor_id, facility_id, db)
+
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=days)
+
+    # Load all readings in the window
+    result = await db.execute(
+        select(
+            func.date_trunc("day", CompressorReading.recorded_at).label("day"),
+            func.avg(CompressorReading.discharge_pressure_psi).label("avg_discharge"),
+            func.avg(CompressorReading.oil_temp_f).label("avg_oil_temp"),
+            func.avg(CompressorReading.bearing_temp_f).label("avg_bearing_temp"),
+            func.avg(CompressorReading.vibration_ips).label("avg_vibration"),
+            func.avg(CompressorReading.amp_draw).label("avg_amp"),
+            func.count(CompressorReading.id).label("reading_count"),
+        )
+        .where(
+            CompressorReading.compressor_id == compressor_id,
+            CompressorReading.recorded_at >= since,
+        )
+        .group_by(func.date_trunc("day", CompressorReading.recorded_at))
+        .order_by(func.date_trunc("day", CompressorReading.recorded_at))
+    )
+    rows = result.all()
+
+    # Compute simplified health proxy per day
+    # Uses alarm thresholds from compressor model, falls back to defaults
+    defaults = {
+        "discharge_psi_high": comp.alarm_discharge_psi_high or 250.0,
+        "oil_temp_high": comp.alarm_oil_temp_high or 180.0,
+        "bearing_temp_high": comp.alarm_bearing_temp_high or 200.0,
+        "vibration_high": comp.alarm_vibration_high or 0.3,
+    }
+
+    daily_scores = []
+    for row in rows:
+        penalties = []
+        if row.avg_discharge and defaults["discharge_psi_high"]:
+            margin = (defaults["discharge_psi_high"] - row.avg_discharge) / (defaults["discharge_psi_high"] * 0.3)
+            penalties.append(max(0.0, min(1.0, margin)))
+        if row.avg_oil_temp and defaults["oil_temp_high"]:
+            margin = (defaults["oil_temp_high"] - row.avg_oil_temp) / (defaults["oil_temp_high"] * 0.3)
+            penalties.append(max(0.0, min(1.0, margin)))
+        if row.avg_bearing_temp and defaults["bearing_temp_high"]:
+            margin = (defaults["bearing_temp_high"] - row.avg_bearing_temp) / (defaults["bearing_temp_high"] * 0.3)
+            penalties.append(max(0.0, min(1.0, margin)))
+        if row.avg_vibration and defaults["vibration_high"]:
+            margin = (defaults["vibration_high"] - row.avg_vibration) / defaults["vibration_high"]
+            penalties.append(max(0.0, min(1.0, margin)))
+
+        score = round((sum(penalties) / len(penalties)) * 100, 1) if penalties else None
+        daily_scores.append({
+            "date": row.day.strftime("%Y-%m-%d") if row.day else None,
+            "score": score,
+            "reading_count": row.reading_count,
+        })
+
+    # Linear trend projection using least-squares on available scores
+    scored_days = [(i, d["score"]) for i, d in enumerate(daily_scores) if d["score"] is not None]
+    days_to_threshold = None
+    trend_slope = None
+    projected_maintenance_date = None
+
+    if len(scored_days) >= 5:
+        n = len(scored_days)
+        xs = [p[0] for p in scored_days]
+        ys = [p[1] for p in scored_days]
+        x_mean = sum(xs) / n
+        y_mean = sum(ys) / n
+        numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys))
+        denominator = sum((x - x_mean) ** 2 for x in xs)
+        if denominator > 0:
+            trend_slope = numerator / denominator  # points/day
+            # Project forward from today
+            current_x = len(daily_scores)
+            current_y = ys[-1]
+            maintenance_threshold = 70.0
+            if trend_slope < 0 and current_y > maintenance_threshold:
+                days_until = (current_y - maintenance_threshold) / abs(trend_slope)
+                days_to_threshold = round(days_until)
+                projected_maintenance_date = (now + timedelta(days=days_until)).strftime("%Y-%m-%d")
+
+    current_score = comp.health_score
+    maintenance_urgency = (
+        "immediate" if current_score is not None and current_score < 40
+        else "soon" if (days_to_threshold is not None and days_to_threshold <= 14)
+        else "monitor" if (days_to_threshold is not None and days_to_threshold <= 60)
+        else "healthy"
+    )
+
+    return {
+        "compressor_id": str(comp.id),
+        "compressor_name": comp.name,
+        "current_health_score": current_score,
+        "trend_slope_per_day": round(trend_slope, 3) if trend_slope is not None else None,
+        "days_to_maintenance_threshold": days_to_threshold,
+        "projected_maintenance_date": projected_maintenance_date,
+        "maintenance_urgency": maintenance_urgency,
+        "daily_scores": daily_scores,
+    }
+
+
 # ── Anomaly detection helper ────────────────────
 
 def _detect_anomalies(comp: Compressor, reading: CompressorReading) -> list[str]:

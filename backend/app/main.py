@@ -16,7 +16,7 @@ from app.core.database import async_session
 from app.core.rate_limit import RateLimiter
 
 settings = get_settings()
-logger = logging.getLogger("coldgrid")
+logger = logging.getLogger("kelvex")
 auth_rate_limiter = RateLimiter(settings.REDIS_URL) if settings.REDIS_URL else None
 api_rate_limiter = RateLimiter(settings.REDIS_URL) if settings.REDIS_URL else None
 health_redis = Redis.from_url(settings.REDIS_URL, decode_responses=True) if settings.REDIS_URL else None

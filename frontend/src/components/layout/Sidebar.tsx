@@ -1,14 +1,15 @@
 import { NavLink } from 'react-router-dom'
 import {
-  Building2, AlertTriangle, Settings, LogOut, Sun, Moon,
-  ShieldCheck, Wrench, ClipboardList, BarChart3, PlayCircle, Radio,
-  Users, History, Shield,
+  Home, MapPin, Bell, Thermometer, Zap, Wrench,
+  FileText, BarChart2, Plug, Settings, LogOut,
+  Sun, Moon, ShieldCheck,
 } from 'lucide-react'
 import KelvexLogo from '../ui/KelvexLogo'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useSiteContext } from '../../contexts/SiteContext'
 import { useAlertSummary } from '../../hooks/useAlerts'
+import type { UserRole } from '../../lib/api'
 import SiteSelector from './SiteSelector'
 
 function AlertBadge({ count, hasCritical }: { count: number; hasCritical: boolean }) {
@@ -24,10 +25,9 @@ function AlertBadge({ count, hasCritical }: { count: number; hasCritical: boolea
       fontWeight: 700,
       lineHeight: '18px',
       textAlign: 'center',
-      background: hasCritical ? 'var(--danger)' : 'rgba(234, 179, 8, 0.85)',
+      background: hasCritical ? 'var(--danger)' : 'rgba(234,179,8,0.85)',
       color: '#fff',
       flexShrink: 0,
-      boxShadow: hasCritical ? '0 0 0 2px rgba(239,68,68,0.25)' : 'none',
       animation: hasCritical ? 'badge-pulse 2s ease-in-out infinite' : 'none',
     }}>
       {count > 99 ? '99+' : count}
@@ -35,44 +35,79 @@ function AlertBadge({ count, hasCritical }: { count: number; hasCritical: boolea
   )
 }
 
-function useNavSections(alertCount: number, hasCritical: boolean) {
-  const { site } = useSiteContext()
-  const facilityPrefix = site ? `/facilities/${site.id}` : null
+interface NavItem {
+  to: string
+  icon: React.ReactNode
+  label: string
+  badge?: React.ReactNode
+  end?: boolean
+  gate?: UserRole[]  // if set, only these roles see this item
+}
+
+function buildNavItems(
+  role: UserRole | undefined,
+  siteId: string | null,
+  alertCount: number,
+  hasCritical: boolean,
+): { label: string; items: NavItem[] }[] {
+  const siteHref = siteId ? `/sites/${siteId}` : '/sites'
+  const alertBadge = <AlertBadge count={alertCount} hasCritical={hasCritical} />
+
+  // Core nav — spec §2, always visible
+  const coreItems: NavItem[] = [
+    { to: '/',          icon: <Home size={16} />,       label: 'Portfolio',              end: true },
+    { to: siteHref,     icon: <MapPin size={16} />,     label: 'Sites' },
+    { to: '/alerts',    icon: <Bell size={16} />,       label: 'Alerts',  badge: alertBadge },
+    { to: '/refrigerant', icon: <Thermometer size={16} />, label: 'Refrigerant & Compliance' },
+    { to: '/energy',    icon: <Zap size={16} />,        label: 'Energy & Cost' },
+    { to: '/maintenance', icon: <Wrench size={16} />,   label: 'Maintenance & Audit' },
+    { to: '/documents', icon: <FileText size={16} />,   label: 'Documents' },
+    { to: '/reports',   icon: <BarChart2 size={16} />,  label: 'Reports & Exports' },
+    {
+      to: '/tunnel',
+      icon: <Plug size={16} />,
+      label: 'Controller Access',
+      gate: ['kelvex_admin', 'owner', 'admin', 'technician'],
+    },
+  ]
+
+  // Filter gated items
+  const visibleCore = coreItems.filter(
+    item => !item.gate || (role && item.gate.includes(role))
+  )
+
+  // Role-aware ordering: put the role's primary items first
+  function reorder(items: NavItem[]): NavItem[] {
+    if (!role) return items
+    let priority: string[] = []
+    if (role === 'finance') priority = ['/energy', '/documents', '/reports']
+    if (role === 'technician') priority = ['/sites', '/alerts', '/tunnel', '/maintenance']
+    if (role === 'ops_manager' || role === 'plant_manager')
+      priority = ['/', '/alerts', '/maintenance', '/refrigerant']
+    if (!priority.length) return items
+
+    const hi = items.filter(i => priority.includes(i.to))
+    const lo = items.filter(i => !priority.includes(i.to))
+    return [...hi, ...lo]
+  }
+
+  const orderedCore = reorder(visibleCore)
+
+  const settingsItems: NavItem[] = [
+    { to: '/settings', icon: <Settings size={16} />, label: 'Settings' },
+  ]
+
+  if (role === 'kelvex_admin') {
+    settingsItems.unshift({
+      to: '/admin',
+      icon: <ShieldCheck size={16} />,
+      label: 'Admin Console',
+    })
+  }
 
   return [
-    {
-      label: 'Overview',
-      items: [
-        { to: '/', icon: <Building2 size={17} />, label: 'Dashboard', end: true, badge: null },
-        ...(facilityPrefix
-          ? [{ to: facilityPrefix, icon: <BarChart3 size={17} />, label: site?.name || 'Facility', badge: null }]
-          : []
-        ),
-      ],
-    },
-    {
-      label: 'Operations',
-      items: [
-        {
-          to: '/alerts', icon: <AlertTriangle size={17} />, label: 'Alerts',
-          badge: <AlertBadge count={alertCount} hasCritical={hasCritical} />,
-        },
-        { to: '/alert-rules', icon: <Shield size={17} />, label: 'Alert Rules', badge: null },
-        { to: '/automation', icon: <PlayCircle size={17} />, label: 'Automation', badge: null },
-        { to: '/compliance', icon: <ShieldCheck size={17} />, label: 'Compliance', badge: null },
-        { to: '/maintenance', icon: <Wrench size={17} />, label: 'Maintenance', badge: null },
-        { to: '/reports', icon: <ClipboardList size={17} />, label: 'Reports', badge: null },
-      ],
-    },
-    {
-      label: 'System',
-      items: [
-        { to: '/agents', icon: <Radio size={17} />, label: 'Edge Agents', badge: null },
-        { to: '/team', icon: <Users size={17} />, label: 'Team', badge: null },
-        { to: '/activity', icon: <History size={17} />, label: 'Activity Log', badge: null },
-        { to: '/settings', icon: <Settings size={17} />, label: 'Settings', badge: null },
-      ],
-    },
+    { label: 'Navigation', items: orderedCore },
+    { label: 'Account',    items: settingsItems },
   ]
 }
 
@@ -84,11 +119,17 @@ interface SidebarProps {
 export default function Sidebar({ onNavClick, mobileOpen }: SidebarProps = {}) {
   const { user, logout } = useAuth()
   const { theme, toggle } = useTheme()
+  const { site } = useSiteContext()
   const { data: alertSummary } = useAlertSummary()
 
   const alertCount = alertSummary?.total_active ?? 0
   const hasCritical = (alertSummary?.by_severity?.critical ?? 0) > 0
-  const sections = useNavSections(alertCount, hasCritical)
+  const sections = buildNavItems(
+    user?.role,
+    site?.id ?? null,
+    alertCount,
+    hasCritical,
+  )
 
   const initials = user
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -113,7 +154,7 @@ export default function Sidebar({ onNavClick, mobileOpen }: SidebarProps = {}) {
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={'end' in item ? (item as any).end : undefined}
+                end={item.end}
                 onClick={onNavClick}
                 className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
               >

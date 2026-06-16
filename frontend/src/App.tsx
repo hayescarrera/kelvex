@@ -14,6 +14,9 @@ import Login from './pages/Login'
 
 // Lazy-loaded page components
 const FleetOverview = lazy(() => import('./pages/FleetOverview'))
+const FinanceHome = lazy(() => import('./pages/FinanceHome'))
+const OpsHome = lazy(() => import('./pages/OpsHome'))
+const SitesPage = lazy(() => import('./pages/SitesPage'))
 const FacilityDetail = lazy(() => import('./pages/FacilityDetail'))
 const FacilityOverview = lazy(() => import('./pages/facility/FacilityOverview'))
 const ZonesPage = lazy(() => import('./pages/facility/ZonesPage'))
@@ -39,7 +42,7 @@ const AlertRulesPage = lazy(() => import('./pages/AlertRulesPage'))
 const ReportsPage = lazy(() => import('./pages/ReportsPage'))
 const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
-const CompliancePage = lazy(() => import('./pages/CompliancePage'))
+const LeakTrackingPage = lazy(() => import('./pages/LeakTrackingPage'))
 const MaintenancePage = lazy(() => import('./pages/MaintenancePage'))
 const FacilityMapPage = lazy(() => import('./pages/FacilityMapPage'))
 const NotFound = lazy(() => import('./pages/NotFound'))
@@ -68,6 +71,15 @@ function ProtectedLayout() {
   )
 }
 
+function RoleHome() {
+  const { user } = useAuth()
+  switch (user?.role) {
+    case 'finance':    return <FinanceHome />
+    case 'technician': return <SitesPage />
+    default:           return <FleetOverview />
+  }
+}
+
 function RequireAuth() {
   const { isAuthenticated } = useAuth()
   const location = useLocation()
@@ -87,10 +99,31 @@ function AppRoutes() {
         element={isAuthenticated ? <Navigate to="/" /> : <Login />}
       />
       <Route element={<RequireAuth />}>
-        {/* Dashboard */}
-        <Route index element={<FleetOverview />} />
+        {/* Role-aware home */}
+        <Route index element={<RoleHome />} />
 
-        {/* Facility detail — all facility-specific pages are tabs here */}
+        {/* Named role landing pages (direct links from sidebar) */}
+        <Route path="energy" element={<FinanceHome />} />
+        <Route path="sites" element={<SitesPage />} />
+        <Route path="operations" element={<OpsHome />} />
+
+        {/* Site detail — spec: /sites/:siteId */}
+        <Route path="sites/:facilityId" element={<FacilityDetail />}>
+          <Route index element={<FacilityOverview />} />
+          <Route path="map" element={<FacilityMapPage />} />
+          <Route path="zones" element={<ZonesPage />} />
+          <Route path="equipment" element={<EquipmentPage />} />
+          <Route path="compressors" element={<CompressorFleet />} />
+          <Route path="monitor" element={<LiveMonitorPage />} />
+          <Route path="energy" element={<EnergyOptimization />} />
+          <Route path="controls" element={<ControlsPage />} />
+          <Route path="agents" element={<AgentsPage />} />
+          <Route path="integrations" element={<IntegrationsPage />} />
+          <Route path="bills" element={<BillsPage />} />
+          <Route path="demand" element={<DemandTab />} />
+        </Route>
+
+        {/* Backward-compat alias: /facilities/:id → /sites/:id */}
         <Route path="facilities/:facilityId" element={<FacilityDetail />}>
           <Route index element={<FacilityOverview />} />
           <Route path="map" element={<FacilityMapPage />} />
@@ -106,20 +139,27 @@ function AppRoutes() {
           <Route path="demand" element={<DemandTab />} />
         </Route>
 
-        {/* Global pages */}
+        {/* Global nav pages — spec §2 */}
         <Route path="alerts" element={<AlertsPage />} />
-        <Route path="compliance" element={<CompliancePage />} />
+        <Route path="refrigerant" element={<LeakTrackingPage />} />
         <Route path="maintenance" element={<MaintenancePage />} />
+        <Route path="documents" element={<ReportsPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="tunnel" element={<ControlsPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="admin" element={<OnboardingPage />} />
 
-        {/* Secondary pages (accessible via links but not in main sidebar) */}
+        {/* Legacy paths — keep working */}
+        <Route path="leak-tracking" element={<Navigate to="/refrigerant" replace />} />
+        <Route path="compliance" element={<Navigate to="/refrigerant" replace />} />
+        <Route path="food-safety" element={<Navigate to="/refrigerant" replace />} />
         <Route path="alert-rules" element={<AlertRulesPage />} />
         <Route path="demand" element={<DemandPage />} />
         <Route path="savings" element={<SavingsSimulator />} />
         <Route path="bills" element={<BillsGlobal />} />
         <Route path="compare" element={<SiteComparison />} />
         <Route path="automation" element={<AutomationPage />} />
+        <Route path="schedules" element={<AutomationPage />} />
         <Route path="agents" element={<EdgeAgentsPage />} />
         <Route path="team" element={<UserManagementPage />} />
         <Route path="activity" element={<ActivityLogPage />} />

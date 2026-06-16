@@ -24,6 +24,8 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.compliance import MaintenanceTask
+from app.models.alert import Alert
+from app.models.refrigerant import LeakEvent
 from app.services.audit_service import log_activity
 
 router = APIRouter(prefix="/maintenance", tags=["maintenance"])
@@ -253,6 +255,146 @@ async def cancel_task(
         raise HTTPException(status_code=404, detail="Task not found")
     task.state = "cancelled"
     await db.commit()
+
+
+# ── Auto Work-Order Generation ───────────────────
+
+_SEVERITY_TO_PRIORITY = {"critical": "critical", "high": "high", "medium": "medium", "low": "low", "info": "low"}
+
+
+@router.post("/tasks/from-alert", status_code=status.HTTP_201_CREATED)
+async def create_task_from_alert(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Auto-generate a corrective maintenance work order from an alert.
+
+    Body: {"alert_id": "<uuid>"}
+
+    Looks up the alert, maps severity → task priority, builds a title and
+    description with full diagnostic context, and creates a scheduled task.
+    """
+    alert_id = body.get("alert_id")
+    if not alert_id:
+        raise HTTPException(status_code=400, detail="alert_id required")
+
+    result = await db.execute(
+        select(Alert).where(Alert.id == alert_id)
+    )
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    # Verify org access via facility
+    await _verify_facility(alert.facility_id, current_user, db)
+
+    # Map alert context to task fields
+    priority = _SEVERITY_TO_PRIORITY.get(alert.severity, "medium")
+    category = "corrective"
+    due_in_days = {"critical": 1, "high": 3, "medium": 7, "low": 14}.get(alert.severity, 7)
+    due_date = datetime.now(timezone.utc) + timedelta(days=due_in_days)
+
+    # Build description with context from alert
+    ctx_lines = []
+    if alert.context:
+        for k, v in alert.context.items():
+            ctx_lines.append(f"  {k}: {v}")
+    ctx_str = "\n".join(ctx_lines) if ctx_lines else "  (no additional context)"
+
+    description = (
+        f"Auto-generated from {alert.severity.upper()} alert: {alert.title}\n\n"
+        f"Alert message: {alert.message or 'N/A'}\n"
+        f"Category: {alert.category}\n"
+        f"Alert triggered at: {alert.triggered_at.strftime('%Y-%m-%d %H:%M UTC') if alert.triggered_at else 'unknown'}\n\n"
+        f"Context:\n{ctx_str}"
+    )
+
+    task = MaintenanceTask(
+        facility_id=alert.facility_id,
+        org_id=current_user.org_id,
+        title=f"Investigate: {alert.title}",
+        description=description,
+        category=category,
+        priority=priority,
+        due_date=due_date,
+    )
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+
+    await log_activity(
+        db, user=current_user, org_id=current_user.org_id, action="create",
+        resource_type="maintenance_task", resource_id=str(task.id),
+        resource_name=task.title, facility_id=alert.facility_id,
+        summary=f"Auto-generated work order from alert: {alert.title}",
+    )
+
+    return _task_to_dict(task)
+
+
+@router.post("/tasks/from-leak-event", status_code=status.HTTP_201_CREATED)
+async def create_task_from_leak_event(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Auto-generate a corrective maintenance work order from a refrigerant leak event.
+
+    Body: {"leak_event_id": "<uuid>"}
+
+    Creates a high-priority corrective task with leak diagnostic context.
+    """
+    leak_event_id = body.get("leak_event_id")
+    if not leak_event_id:
+        raise HTTPException(status_code=400, detail="leak_event_id required")
+
+    result = await db.execute(
+        select(LeakEvent).where(LeakEvent.id == leak_event_id)
+    )
+    event = result.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=404, detail="Leak event not found")
+
+    await _verify_facility(event.facility_id, current_user, db)
+
+    # Leak severity → priority mapping
+    severity = getattr(event, "severity", None) or "medium"
+    priority = _SEVERITY_TO_PRIORITY.get(severity, "high")
+    due_date = datetime.now(timezone.utc) + timedelta(days=3)
+
+    description = (
+        f"Auto-generated from refrigerant leak event on {event.rack_name}\n\n"
+        f"Detected: {event.detected_at.strftime('%Y-%m-%d') if event.detected_at else 'unknown'}\n"
+        f"Status: {event.status}\n"
+        f"Estimated loss: {f'{event.estimated_loss_lbs:.1f} lbs' if event.estimated_loss_lbs else 'unknown'}\n"
+        f"Detection method: {event.detection_method or 'manual'}\n\n"
+        f"Action required: Inspect circuit, identify leak source, repair and verify leak-free."
+    )
+
+    task = MaintenanceTask(
+        facility_id=event.facility_id,
+        org_id=current_user.org_id,
+        title=f"Repair refrigerant leak — {event.rack_name}",
+        description=description,
+        category="corrective",
+        priority=priority,
+        due_date=due_date,
+    )
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+
+    await log_activity(
+        db, user=current_user, org_id=current_user.org_id, action="create",
+        resource_type="maintenance_task", resource_id=str(task.id),
+        resource_name=task.title, facility_id=event.facility_id,
+        summary=f"Auto-generated work order from leak event on {event.rack_name}",
+    )
+
+    return _task_to_dict(task)
 
 
 # ── Dashboard & Overdue ──────────────────────────

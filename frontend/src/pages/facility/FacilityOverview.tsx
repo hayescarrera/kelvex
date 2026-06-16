@@ -76,10 +76,10 @@ export default function FacilityOverview() {
                       <span className="zone-card-badge">{zone.state || 'normal'}</span>
                     </div>
                     <div className="zone-card-temp">
-                      {zone.current_temp != null ? `${zone.current_temp}°${zone.temp_unit || 'F'}` : '—'}
+                      {zone.current_temp != null ? `${zone.current_temp}°${zone.temp_unit || 'F'}` : ''}
                     </div>
                     <div className="zone-card-meta">
-                      Setpoint: {zone.temp_setpoint != null ? `${zone.temp_setpoint}°${zone.temp_unit || 'F'}` : '—'}
+                      Setpoint: {zone.temp_setpoint != null ? `${zone.temp_setpoint}°${zone.temp_unit || 'F'}` : ''}
                     </div>
                   </div>
                 )

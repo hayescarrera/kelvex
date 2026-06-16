@@ -120,7 +120,7 @@ export default function LiveMonitorPage() {
             value={summary.in_alarm}
             label="In Alarm"
           />
-          <OrgStat icon={<Gauge size={18} />} color="var(--warning)" value={summary.total_kw ? `${summary.total_kw}` : '—'} label="Total kW" />
+          <OrgStat icon={<Gauge size={18} />} color="var(--warning)" value={summary.total_kw ? `${summary.total_kw}` : ''} label="Total kW" />
           <OrgStat
             icon={summary.offline_agents > 0 ? <WifiOff size={18} /> : <Wifi size={18} />}
             color={summary.offline_agents > 0 ? 'var(--danger)' : 'var(--success)'}
@@ -132,7 +132,7 @@ export default function LiveMonitorPage() {
 
       {/* Facility sections */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 16 }}>
-        {data?.facilities.map(fac => (
+        {(data?.facilities ?? []).map(fac => (
           <FacilitySection key={fac.facility_id} facility={fac} />
         ))}
       </div>
@@ -231,7 +231,30 @@ function FacilitySection({ facility }: { facility: LiveFacility }) {
         </div>
       </div>
 
-      {/* Compressor grid */}
+      {/* Priority alert banner */}
+      {expanded && facility.in_alarm > 0 && (
+        <div style={{
+          margin: '0 18px 12px',
+          padding: '10px 14px',
+          background: 'var(--danger-bg)',
+          border: '1px solid var(--danger-border)',
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 13,
+        }}>
+          <AlertTriangle size={15} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+          <span style={{ fontWeight: 600, color: 'var(--danger)' }}>
+            {facility.in_alarm} unit{facility.in_alarm > 1 ? 's' : ''} require immediate attention
+          </span>
+          <span style={{ color: 'var(--text-secondary)', marginLeft: 4 }}>
+            — sorted to top below
+          </span>
+        </div>
+      )}
+
+      {/* Compressor grid — highest risk first */}
       {expanded && (
         <div style={{
           display: 'grid',
@@ -239,7 +262,18 @@ function FacilitySection({ facility }: { facility: LiveFacility }) {
           gap: 12,
           padding: '0 18px 18px',
         }}>
-          {facility.compressors.map(comp => (
+          {[...facility.compressors].sort((a, b) => {
+            const riskScore = (c: LiveCompressor) => {
+              if (c.state === 'alarm' || c.anomalies.length > 0) return 0
+              if (c.health_score != null && c.health_score < 40) return 1
+              if (c.health_score != null && c.health_score < 70) return 2
+              if (!c.data_stale) return 3
+              return 4
+            }
+            const ra = riskScore(a), rb = riskScore(b)
+            if (ra !== rb) return ra - rb
+            return (a.health_score ?? 100) - (b.health_score ?? 100)
+          }).map(comp => (
             <CompressorCard key={comp.id} compressor={comp} facilityId={String(facility.facility_id)} />
           ))}
           {facility.compressors.length === 0 && (
@@ -253,21 +287,39 @@ function FacilitySection({ facility }: { facility: LiveFacility }) {
   )
 }
 
+// ── Anomaly label map ─────────────────────────────────
+const ANOMALY_LABELS: Record<string, string> = {
+  high_discharge_pressure: 'High discharge pressure',
+  high_oil_temp: 'Oil overheating',
+  high_bearing_temp: 'Bearing overheating',
+  high_vibration: 'Excessive vibration',
+  low_suction_pressure: 'Low suction pressure',
+  high_amp_draw: 'High current draw',
+  low_suction: 'Low suction pressure',
+}
+
+function anomalyLabel(type: string): string {
+  return ANOMALY_LABELS[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 // ── Compressor card ───────────────────────────────────
 function CompressorCard({ compressor: c, facilityId }: { compressor: LiveCompressor; facilityId: string }) {
   const [showControl, setShowControl] = useState(false)
   const isRunning = c.state === 'running' || c.readings.running === true
   const isAlarm = c.state === 'alarm' || c.anomalies.length > 0
-  const borderColor = isAlarm ? 'var(--danger)' : c.data_stale ? 'var(--border)' : 'var(--border)'
+  const isAtRisk = !isAlarm && c.health_score != null && c.health_score < 70
+  const accentColor = isAlarm ? 'var(--danger)' : isAtRisk ? 'var(--warning)' : c.data_stale ? 'var(--border)' : 'var(--success)'
+  const borderColor = isAlarm ? 'var(--danger-border)' : isAtRisk ? 'var(--warning-border)' : 'var(--card-border)'
 
   return (
     <div style={{
       background: 'var(--card-bg)',
       border: `1px solid ${borderColor}`,
+      borderLeft: `3px solid ${accentColor}`,
       borderRadius: 10,
       overflow: 'hidden',
       opacity: c.data_stale && !isRunning ? 0.7 : 1,
-      boxShadow: isAlarm ? '0 0 12px rgba(239,68,68,0.15)' : undefined,
+      boxShadow: isAlarm ? '0 0 16px rgba(201,49,49,0.12)' : isAtRisk ? '0 0 12px rgba(193,126,19,0.08)' : undefined,
     }}>
       {/* Header */}
       <div style={{
@@ -326,12 +378,14 @@ function CompressorCard({ compressor: c, facilityId }: { compressor: LiveCompres
 
       {/* Anomaly bar */}
       {c.anomalies.length > 0 && (
-        <div style={{ padding: '6px 14px', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', fontSize: 11, color: 'var(--danger)' }}>
+        <div style={{ padding: '8px 14px', background: 'var(--danger-bg)', borderTop: '1px solid var(--danger-border)' }}>
           {c.anomalies.map((a, i) => (
-            <span key={i}>
-              {i > 0 && ' · '}
-              {a.type.replace(/_/g, ' ')}: {a.value.toFixed(1)} (limit: {a.threshold})
-            </span>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--danger)', lineHeight: 1.6 }}>
+              <span style={{ fontWeight: 600 }}>⚠ {anomalyLabel(a.type)}</span>
+              <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>
+                {a.value.toFixed(1)} / {a.threshold} limit
+              </span>
+            </div>
           ))}
         </div>
       )}
@@ -776,19 +830,24 @@ function CompressorControlPanel({
 
 function HealthBadge({ score }: { score: number }) {
   const color = score >= 70 ? 'var(--success)' : score >= 40 ? 'var(--warning)' : 'var(--danger)'
+  const bgColor = score >= 70 ? 'var(--success-bg)' : score >= 40 ? 'var(--warning-bg)' : 'var(--danger-bg)'
+  const label = score >= 70 ? 'Healthy' : score >= 40 ? 'At Risk' : 'Critical'
+  const circumference = 2 * Math.PI * 7
   return (
     <span style={{
-      fontSize: 11, fontWeight: 700, color,
-      display: 'flex', alignItems: 'center', gap: 3,
+      display: 'flex', alignItems: 'center', gap: 5,
+      background: bgColor, borderRadius: 20, padding: '3px 8px 3px 4px',
+      fontSize: 12, fontWeight: 700, color,
     }}>
-      <svg width="12" height="12" viewBox="0 0 12 12">
-        <circle cx="6" cy="6" r="5" fill="none" stroke="var(--border)" strokeWidth="2" />
-        <circle cx="6" cy="6" r="5" fill="none" stroke={color} strokeWidth="2"
-          strokeDasharray={`${(score / 100) * 31.4} 31.4`}
-          transform="rotate(-90 6 6)"
+      <svg width="18" height="18" viewBox="0 0 18 18" style={{ flexShrink: 0 }}>
+        <circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2" opacity={0.2} />
+        <circle cx="9" cy="9" r="7" fill="none" stroke="currentColor" strokeWidth="2"
+          strokeDasharray={`${(score / 100) * circumference} ${circumference}`}
+          strokeLinecap="round"
+          transform="rotate(-90 9 9)"
         />
       </svg>
-      {score}
+      {score} <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.8 }}>{label}</span>
     </span>
   )
 }

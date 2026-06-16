@@ -1,5 +1,5 @@
 /**
- * useEventStream — React hook for Server-Sent Events from ColdGrid.
+ * useEventStream — React hook for Server-Sent Events from Kelvex.
  *
  * Connects to /api/v1/events/stream, auto-reconnects on disconnect,
  * and dispatches typed event callbacks.
@@ -8,13 +8,13 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { api } from '../lib/api'
 
-export interface ColdGridEvent {
+export interface KelvexEvent {
   type: string
   data: Record<string, unknown>
   timestamp: string
 }
 
-type EventHandler = (event: ColdGridEvent) => void
+type EventHandler = (event: KelvexEvent) => void
 
 export function useEventStream(handlers?: Record<string, EventHandler>) {
   const [connected, setConnected] = useState(false)
@@ -33,7 +33,7 @@ export function useEventStream(handlers?: Record<string, EventHandler>) {
 
     es.onmessage = (ev) => {
       try {
-        const event: ColdGridEvent = JSON.parse(ev.data)
+        const event: KelvexEvent = JSON.parse(ev.data)
         // Call type-specific handler
         const h = handlersRef.current?.[event.type]
         if (h) h(event)

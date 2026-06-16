@@ -2,7 +2,7 @@
 # Kelvex Edge Agent — Quick Install Script
 #
 # Run on the gateway device (Raspberry Pi, Intel NUC, etc.):
-#   curl -fsSL https://github.com/kelvex/platform/releases/latest/download/install.sh | sudo bash
+#   curl -fsSL https://github.com/hayescarrera/kelvex/releases/latest/download/install.sh | sudo bash
 #
 # Or manually:
 #   chmod +x install.sh && sudo ./install.sh

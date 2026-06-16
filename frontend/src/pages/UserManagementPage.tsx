@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useSiteContext } from '../contexts/SiteContext'
 import { useOrgMembers, useInviteMember, useUpdateMember, useRemoveMember } from '../hooks/useMembers'
+import LoadingState from '../components/ui/LoadingState'
 import {
   ROLE_LABELS, ROLE_ORDER, GLOBAL_ACCESS_ROLES,
   type UserRole, type OrgMember,
@@ -408,11 +409,11 @@ export default function UserManagementPage() {
   }), [members])
 
   if (isLoading) {
-    return <div className="page-loading">Loading team...</div>
+    return <LoadingState />
   }
 
   return (
-    <div className="page-content">
+    <div className="page-container">
       <div className="page-header">
         <div>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -505,7 +506,7 @@ export default function UserManagementPage() {
                   <td>{label as string}</td>
                   {(perms as boolean[]).map((has, i) => (
                     <td key={i} style={{ textAlign: 'center' }}>
-                      {has ? <Check size={14} style={{ color: 'var(--success)' }} /> : <span style={{ color: 'var(--text-tertiary)' }}>—</span>}
+                      {has ? <Check size={14} style={{ color: 'var(--success)' }} /> : <span style={{ color: 'var(--text-tertiary)', fontSize: 10 }}>·</span>}
                     </td>
                   ))}
                 </tr>

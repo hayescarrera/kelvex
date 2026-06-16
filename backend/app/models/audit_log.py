@@ -68,5 +68,10 @@ class ActivityLog(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
+    # Tamper-evident hash chain — SHA256(prev_hash || canonical_payload)
+    # prev_hash is NULL only for the first record per org.
+    prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
     def __repr__(self):
         return f"<ActivityLog {self.action} {self.resource_type} by {self.actor_email}>"

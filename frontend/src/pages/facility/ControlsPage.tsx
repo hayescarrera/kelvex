@@ -1,30 +1,64 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Play, Plus, X, Power, PowerOff } from 'lucide-react'
+import { Play, Plus, X, Power, PowerOff, CheckCircle, XCircle, Clock, Shield } from 'lucide-react'
 import LoadingState from '../../components/ui/LoadingState'
+import EmptyState from '../../components/ui/EmptyState'
 import {
   useSequences, useCreateSequence, useRunSequence,
   useAutomationRules, useCreateAutomationRule, useUpdateAutomationRule,
+  usePlantCommands, useCancelCommand, useApproveCommand, useControlAuditLog,
 } from '../../hooks/useControls'
+import type { PlantCommand } from '../../lib/api'
 
 const SEQUENCE_TYPES = ['pre_cool', 'load_shed', 'night_setback', 'demand_response', 'defrost', 'custom']
 const TRIGGER_METRICS = ['zone_temp', 'demand_kw', 'energy_price', 'outdoor_temp', 'schedule']
 const TRIGGER_OPERATORS = ['gt', 'lt', 'gte', 'lte', 'eq']
 const ACTION_TYPES = ['set_setpoint', 'disable_equipment', 'enable_equipment', 'run_sequence', 'send_alert']
 
+const CMD_STATE_BADGE: Record<string, string> = {
+  pending_approval: 'badge-warning',
+  pending: 'badge-info',
+  sent: 'badge-info',
+  acknowledged: 'badge-info',
+  completed: 'badge-success',
+  failed: 'badge-danger',
+  cancelled: 'badge-neutral',
+  expired: 'badge-neutral',
+}
+
+function formatRelTime(val: string | null | undefined) {
+  if (!val) return '—'
+  const d = new Date(val)
+  const diff = Date.now() - d.getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return d.toLocaleDateString()
+}
+
 export default function ControlsPage() {
   const { facilityId } = useParams<{ facilityId: string }>()
-  const [activeTab, setActiveTab] = useState<'sequences' | 'rules'>('sequences')
+  const [activeTab, setActiveTab] = useState<'sequences' | 'rules' | 'commands' | 'audit'>('sequences')
   const [showSeqModal, setShowSeqModal] = useState(false)
   const [showRuleModal, setShowRuleModal] = useState(false)
 
   const { data: seqData, isLoading: seqLoading } = useSequences(facilityId!)
   const { data: ruleData, isLoading: rulesLoading } = useAutomationRules(facilityId!)
+  const { data: cmdData, isLoading: cmdLoading } = usePlantCommands(facilityId!)
+  const { data: auditData, isLoading: auditLoading } = useControlAuditLog(facilityId!)
   const sequences = seqData?.sequences ?? []
   const rules = ruleData?.rules ?? []
+  const commands = cmdData?.commands ?? []
+  const auditLogs = auditData?.logs ?? []
 
   const runSequence = useRunSequence(facilityId!)
   const updateRule = useUpdateAutomationRule(facilityId!)
+  const cancelCmd = useCancelCommand(facilityId!)
+  const approveCmd = useApproveCommand(facilityId!)
+
+  const pendingApprovalCount = commands.filter((c: PlantCommand) => c.state === 'pending_approval').length
 
   const formatDateTime = (val: string | null | undefined) =>
     val ? new Date(val).toLocaleString() : '\u2014'
@@ -45,13 +79,30 @@ export default function ControlsPage() {
             <button className={activeTab === 'rules' ? 'active' : ''} onClick={() => setActiveTab('rules')}>
               Rules ({rules.length})
             </button>
+            <button className={activeTab === 'commands' ? 'active' : ''} onClick={() => setActiveTab('commands')}
+              style={{ position: 'relative' }}>
+              Command Queue
+              {pendingApprovalCount > 0 && (
+                <span style={{
+                  marginLeft: 6, fontSize: 10, padding: '1px 6px', borderRadius: 8,
+                  background: 'var(--warning)', color: '#fff', fontWeight: 700,
+                }}>
+                  {pendingApprovalCount}
+                </span>
+              )}
+            </button>
+            <button className={activeTab === 'audit' ? 'active' : ''} onClick={() => setActiveTab('audit')}>
+              Audit Log
+            </button>
           </div>
-          <button
-            className="btn-primary"
-            onClick={() => activeTab === 'sequences' ? setShowSeqModal(true) : setShowRuleModal(true)}
-          >
-            <Plus size={14} /> {activeTab === 'sequences' ? 'New Sequence' : 'New Rule'}
-          </button>
+          {(activeTab === 'sequences' || activeTab === 'rules') && (
+            <button
+              className="btn-primary"
+              onClick={() => activeTab === 'sequences' ? setShowSeqModal(true) : setShowRuleModal(true)}
+            >
+              <Plus size={14} /> {activeTab === 'sequences' ? 'New Sequence' : 'New Rule'}
+            </button>
+          )}
         </div>
 
         <div className="card-body" style={{ padding: 0 }}>
@@ -149,6 +200,135 @@ export default function ControlsPage() {
                             {rule.enabled ? <PowerOff size={14} /> : <Power size={14} />}
                           </button>
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          )}
+          {activeTab === 'commands' && (
+            <>
+              {cmdLoading ? (
+                <LoadingState rows={4} />
+              ) : commands.length === 0 ? (
+                <EmptyState
+                  icon={<CheckCircle size={22} />}
+                  title="No commands"
+                  description="Commands issued via control sequences or plant control will appear here."
+                />
+              ) : (
+                <>
+                  {pendingApprovalCount > 0 && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '10px 16px', background: 'color-mix(in srgb, var(--warning) 12%, transparent)',
+                      borderBottom: '1px solid var(--border)', fontSize: 13,
+                    }}>
+                      <Shield size={14} style={{ color: 'var(--warning)' }} />
+                      <strong>{pendingApprovalCount} command{pendingApprovalCount !== 1 ? 's' : ''} awaiting approval</strong>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>— Review and approve before they execute</span>
+                    </div>
+                  )}
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Command</th>
+                        <th>State</th>
+                        <th>Source</th>
+                        <th>Issued</th>
+                        <th style={{ width: 120 }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {commands.map((cmd: PlantCommand) => {
+                        const target = (cmd.parameters.compressor_name || cmd.parameters.zone_name || cmd.parameters.device_name) as string | undefined
+                        return (
+                          <tr key={cmd.id}>
+                            <td>
+                              <span className="cell-primary">{cmd.command_type.replace(/_/g, ' ')}</span>
+                              {target && <span className="cell-secondary">{target}</span>}
+                            </td>
+                            <td>
+                              <span className={`badge ${CMD_STATE_BADGE[cmd.state] ?? 'badge-neutral'}`}>
+                                <span className="badge-dot" /> {cmd.state.replace(/_/g, ' ')}
+                              </span>
+                            </td>
+                            <td style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{cmd.source}</td>
+                            <td>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                                <Clock size={12} /> {formatRelTime(cmd.issued_at)}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                {cmd.state === 'pending_approval' && (
+                                  <button
+                                    className="btn-primary"
+                                    style={{ padding: '3px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                                    onClick={() => approveCmd.mutate(cmd.id)}
+                                    disabled={approveCmd.isPending}
+                                    title="Approve — release for execution"
+                                  >
+                                    <CheckCircle size={12} /> Approve
+                                  </button>
+                                )}
+                                {(cmd.state === 'pending' || cmd.state === 'pending_approval') && (
+                                  <button
+                                    className="btn-secondary"
+                                    style={{ padding: '3px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                                    onClick={() => cancelCmd.mutate(cmd.id)}
+                                    disabled={cancelCmd.isPending}
+                                    title="Cancel — prevent execution"
+                                  >
+                                    <XCircle size={12} /> Cancel
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </>
+          )}
+
+          {activeTab === 'audit' && (
+            <>
+              {auditLoading ? (
+                <LoadingState rows={5} />
+              ) : auditLogs.length === 0 ? (
+                <EmptyState
+                  icon={<Shield size={22} />}
+                  title="No audit entries"
+                  description="Every control action taken at this facility is logged here."
+                />
+              ) : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Target</th>
+                      <th>Result</th>
+                      <th>When</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map((log: any) => (
+                      <tr key={log.id}>
+                        <td><span className="cell-primary">{log.action.replace(/_/g, ' ')}</span></td>
+                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                          {log.target_name || log.target_type}
+                        </td>
+                        <td>
+                          <span className={`badge ${log.result === 'queued' || log.result === 'ok' ? 'badge-success' : log.result === 'failed' ? 'badge-danger' : 'badge-neutral'}`}>
+                            {log.result ?? '—'}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{formatRelTime(log.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>
