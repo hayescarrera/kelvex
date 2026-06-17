@@ -1121,6 +1121,75 @@ class ApiClient {
       `/escalation/test/${policyId}`, { method: 'POST' }
     )
   }
+
+  // ── Documents ─────────────────────────────
+  async listDocuments(params?: { facility_id?: string; document_type?: string; limit?: number }) {
+    const qs = new URLSearchParams()
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)) })
+    return this.request<{ documents: Document[]; total: number }>(`/documents?${qs}`)
+  }
+
+  async uploadDocument(file: File, metadata: { facility_id?: string; equipment_id?: string; document_type: string; name?: string }) {
+    const formData = new FormData()
+    formData.append('file', file)
+    Object.entries(metadata).forEach(([k, v]) => { if (v) formData.append(k, v) })
+    const upload = async (): Promise<Response> => {
+      const headers: Record<string, string> = {}
+      if (this.token) headers['Authorization'] = `Bearer ${this.token}`
+      return fetch(`${API_BASE}/documents`, { method: 'POST', headers, body: formData })
+    }
+    let response = await upload()
+    if (response.status === 401) {
+      const newToken = await this.refreshAccessToken()
+      if (newToken) response = await upload()
+      else this.onUnauthorized?.()
+    }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Upload failed' }))
+      throw new Error(error.detail || `HTTP ${response.status}`)
+    }
+    return response.json() as Promise<Document>
+  }
+
+  async deleteDocument(documentId: string) {
+    return this.request(`/documents/${documentId}`, { method: 'DELETE' })
+  }
+
+  // ── Tunnel Sessions ───────────────────────
+  async listTunnelSessions(params?: { facility_id?: string; limit?: number }) {
+    const qs = new URLSearchParams()
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)) })
+    return this.request<{ sessions: TunnelSession[]; total: number }>(`/tunnel/sessions?${qs}`)
+  }
+
+  async startTunnelSession(data: { facility_id: string; target_device?: string; notes?: string }) {
+    return this.request<TunnelSession>('/tunnel/sessions', { method: 'POST', body: data })
+  }
+
+  async endTunnelSession(sessionId: string, data?: { end_reason?: string }) {
+    return this.request<TunnelSession>(`/tunnel/sessions/${sessionId}/end`, { method: 'POST', body: data || {} })
+  }
+
+  // ── Maintenance Events ────────────────────
+  async listMaintenanceEvents(params?: { facility_id?: string; event_type?: string; limit?: number }) {
+    const qs = new URLSearchParams()
+    if (params) Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)) })
+    return this.request<{ events: MaintenanceEventEntry[]; total: number }>(`/maintenance/events?${qs}`)
+  }
+
+  async createMaintenanceEvent(data: {
+    facility_id: string
+    equipment_id?: string
+    event_type: string
+    description: string
+    technician_name: string
+    technician_company?: string
+    occurred_at?: string
+    linked_alert_id?: string
+    linked_refrigerant_event_id?: string
+  }) {
+    return this.request<MaintenanceEventEntry>('/maintenance/events', { method: 'POST', body: data })
+  }
 }
 
 // ── Types ───────────────────────────────────────
@@ -2352,6 +2421,7 @@ export interface RefrigerantAdd {
   amount_lbs: number
   cost_per_lb: number | null
   technician_name: string
+  technician_epa_cert: string | null
   added_at: string
   notes: string | null
   created_at: string
@@ -2448,4 +2518,50 @@ export interface DetectionInsights {
   }
   circuits_forecasted: number
   circuits_approaching_threshold: number
+}
+
+export interface Document {
+  id: string
+  org_id: string
+  facility_id: string | null
+  equipment_id: string | null
+  document_type: string
+  name: string
+  storage_key: string
+  content_type: string | null
+  size_bytes: number | null
+  metadata_: Record<string, unknown> | null
+  uploaded_by: string | null
+  created_at: string
+}
+
+export interface TunnelSession {
+  id: string
+  org_id: string
+  facility_id: string
+  agent_id: string | null
+  user_id: string
+  user_email: string
+  target_device: string | null
+  started_at: string
+  ended_at: string | null
+  end_reason: string | null
+  ip_address: string | null
+  notes: string | null
+}
+
+export interface MaintenanceEventEntry {
+  id: string
+  org_id: string
+  facility_id: string
+  equipment_id: string | null
+  linked_alert_id: string | null
+  linked_refrigerant_event_id: string | null
+  event_type: string
+  description: string
+  technician_name: string
+  technician_company: string | null
+  occurred_at: string
+  created_by: string | null
+  created_at: string
 }

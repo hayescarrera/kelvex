@@ -248,6 +248,7 @@ function LogAddModal({ facilityId, onClose, onSuccess }: LogAddModalProps) {
     amount_lbs: '',
     cost_per_lb: '',
     technician_name: '',
+    technician_epa_cert: '',
     added_at: new Date().toISOString().slice(0, 16),
     notes: '',
   })
@@ -266,6 +267,7 @@ function LogAddModal({ facilityId, onClose, onSuccess }: LogAddModalProps) {
         amount_lbs: parseFloat(form.amount_lbs),
         cost_per_lb: form.cost_per_lb ? parseFloat(form.cost_per_lb) : undefined,
         technician_name: form.technician_name,
+        technician_epa_cert: form.technician_epa_cert || undefined,
         added_at: new Date(form.added_at).toISOString(),
         notes: form.notes || undefined,
       })
@@ -320,10 +322,15 @@ function LogAddModal({ facilityId, onClose, onSuccess }: LogAddModalProps) {
                 placeholder="Full name" required />
             </div>
             <div className="field" style={{ flex: 1 }}>
-              <label>Date Added</label>
-              <input type="datetime-local" value={form.added_at}
-                onChange={e => setForm({ ...form, added_at: e.target.value })} />
+              <label>EPA Cert # <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+              <input value={form.technician_epa_cert} onChange={e => setForm({ ...form, technician_epa_cert: e.target.value })}
+                placeholder="e.g. EPA-608-12345" />
             </div>
+          </div>
+          <div className="field">
+            <label>Date Added</label>
+            <input type="datetime-local" value={form.added_at}
+              onChange={e => setForm({ ...form, added_at: e.target.value })} />
           </div>
           <div className="field">
             <label>Notes</label>
@@ -766,7 +773,7 @@ export default function LeakTrackingPage() {
   if (loading) {
     return (
       <div className="page-container">
-        <PageHeader title="Leak Tracking" subtitle="Refrigerant leak detection, adds, and AIM Act compliance" />
+        <PageHeader title="Refrigerant & Compliance" subtitle="Refrigerant tracking, leak detection, and AIM Act compliance" />
         <LoadingState label="Loading refrigerant data..." />
       </div>
     )
@@ -775,9 +782,18 @@ export default function LeakTrackingPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Leak Tracking"
-        subtitle={site ? `${site.name} — Refrigerant tracking and AIM Act compliance` : 'Refrigerant leak detection, adds, and AIM Act compliance'}
-      />
+        title="Refrigerant & Compliance"
+        subtitle={site ? `${site.name} — Refrigerant tracking and AIM Act compliance` : 'Portfolio refrigerant tracking and AIM Act compliance'}
+      >
+        <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => {
+          toast('AIM Act export coming soon — will generate a signed PDF packet', { icon: '📋' })
+        }}>
+          <ShieldCheck size={14} /> AIM Act Packet
+        </button>
+        <button className="btn-primary" onClick={() => setShowLogAdd(true)}>
+          <Plus size={14} /> Log Refrigerant Add
+        </button>
+      </PageHeader>
 
       <TabBar tab={tab} setTab={setTab} counts={{
         'leak-events': leakEvents.length,

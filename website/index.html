@@ -1,571 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kelvex — Cold Storage Intelligence</title>
-  <meta name="description" content="Real-time monitoring, energy optimization, and automated compliance for cold storage facilities. Built for operators who can't afford surprises." />
-  <meta property="og:title" content="Kelvex — Cold Storage Intelligence" />
-  <meta property="og:description" content="Real-time monitoring, energy optimization, and compliance for cold storage facilities." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kelvex — One record for every refrigeration site you run</title>
+<meta name="description" content="Kelvex is the system of record and operations layer for multi-site cold storage. It connects to the controllers you already have, gives you one live view of every site, and keeps audit-ready refrigerant records you own. Vendor-neutral monitoring, live in days.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<!-- ── Nav ──────────────────────────────────────────────── -->
-<header class="nav" id="nav">
-  <div class="nav-inner container">
-    <a href="/" class="nav-logo">
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-        <rect width="28" height="28" rx="7" fill="#0f172a"/>
-        <path d="M4 14L7.5 14L10 8L14 20L18 8L20.5 14L24 14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      Kelvex
+<nav class="nav"><div class="wrap">
+  <a href="index.html" class="brand"><span class="dot"></span>Kelvex</a>
+  <div class="navlinks">
+    <a href="platform.html">Platform</a><a href="data.html">Data layer</a><a href="pricing.html">Pricing</a><a href="company.html">Company</a>
+  </div>
+  <div class="navcta"><a href="https://app.kelvex.io" class="btn">Sign in</a><a href="company.html#request" class="btn btn-accent">Request access</a></div>
+</div></nav>
+
+<header class="hero"><div class="wrap hero-grid">
+  <div class="reveal in">
+    <span class="eyebrow">Built for multi-site cold storage</span>
+    <h1>Every refrigeration site you run, in one record you own.</h1>
+    <p class="lead">Kelvex pulls the controllers you already have into one live view. Watch every site, catch a leak before it drains a system, and hand an auditor proof without digging through a binder.</p>
+    <p class="micro">Live in days. No rip and replace.</p>
+    <div class="hero-cta">
+      <a href="company.html#request" class="btn btn-accent btn-lg">Request access
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a href="platform.html" class="btn btn-lg">See the platform</a>
+    </div>
+  </div>
+  <div class="reveal in">
+    <div class="panel">
+      <div class="panel-bar"><span class="t">Fleet overview</span><span class="live"><span class="pulse"></span>LIVE</span></div>
+      <div class="panel-body">
+        <div class="kpis">
+          <div class="kpi"><div class="v">11</div><div class="l">Sites monitored</div></div>
+          <div class="kpi alert"><div class="v">3</div><div class="l">Open alerts</div></div>
+          <div class="kpi crit"><div class="v">18.4<span style="font-size:13px">%</span></div><div class="l">Top leak rate</div></div>
+        </div>
+        <div class="rows">
+          <div class="row"><span class="site"><span class="sdot s-ok"></span>DC-North · Rack A</span><span class="val">suction 41.2 psi</span><span class="tag tag-ok">Normal</span></div>
+          <div class="row"><span class="site"><span class="sdot s-crit"></span>Cold Store 04 · Rack B</span><span class="val">8 lbs added, 14d</span><span class="tag tag-crit">Charge loss</span></div>
+          <div class="row"><span class="site"><span class="sdot s-watch"></span>Blast-2 · Compressor 3</span><span class="val">short-cycling</span><span class="tag tag-watch">Watch</span></div>
+          <div class="row"><span class="site"><span class="sdot s-ok"></span>Annex (acquired) · mech.</span><span class="val">Kelvex agent</span><span class="tag tag-ok">Online</span></div>
+        </div>
+        <div class="logline">Cold Store 04 · Rack B charge loss · leak rate 18.4% · repair clock started · 6m ago</div>
+      </div>
+    </div>
+  </div>
+</div></header>
+
+<section class="trust alt"><div class="wrap">
+  <div class="trust-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+    <div class="ti-t">Vendor-neutral by design</div>
+    <div class="ti-d">BACnet, Modbus, and every major controller brand, read into a single record you can take in at a glance.</div>
+  </div>
+  <div class="trust-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+    <div class="ti-t">Read-only by default</div>
+    <div class="ti-d">Kelvex records and proves. It never writes to a setpoint, so your controls stay entirely yours.</div>
+  </div>
+  <div class="trust-item">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>
+    <div class="ti-t">Live in days</div>
+    <div class="ti-d">Concierge setup with no capital project and no new wiring. We do the integration work, not your team.</div>
+  </div>
+</div></section>
+
+<section class="section"><div class="wrap">
+  <div class="section-head reveal">
+    <span class="eyebrow">What Kelvex is</span>
+    <h2>The layer your controllers and your equipment vendor were never built to be.</h2>
+    <p class="lead">A site controller keeps the rooms cold tonight. Kelvex sits above all of them and turns what they see into something you can run an operation on and stand behind.</p>
+  </div>
+  <div class="band reveal">
+    <a class="band-item" href="platform.html">
+      <div class="n">01 / RECORD</div><h3>A history you own</h3>
+      <p>Controllers overwrite their data within days. Kelvex keeps it for years and makes it provable, so any site and any window is one export away.</p>
     </a>
-    <nav class="nav-links">
-      <a href="#platform">Platform</a>
-      <a href="#how-it-works">How it works</a>
-      <a href="#integrations">Integrations</a>
-      <a href="pricing.html">Pricing</a>
-    </nav>
-    <div class="nav-actions">
-      <a href="https://app.kelvex.io" class="nav-signin">Sign in</a>
-      <a href="demo.html" class="nav-demo">Request demo</a>
-    </div>
-    <button class="hamburger" id="hamburger" aria-label="Open menu">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-    </button>
+    <a class="band-item" href="platform.html">
+      <div class="n">02 / REACH</div><h3>Every site, every brand</h3>
+      <p>Modern supervisors, older boxes, and mixed manufacturers, read into one place, including the sites a single vendor's cloud cannot see.</p>
+    </a>
+    <a class="band-item" href="platform.html">
+      <div class="n">03 / OPERATIONS</div><h3>Run the cold side</h3>
+      <p>Alerts worth acting on, refrigerant and maintenance logged in seconds, and what the plant costs to run, all on one screen.</p>
+    </a>
   </div>
-  <div class="mobile-drawer" id="drawer">
-    <a href="#platform">Platform</a>
-    <a href="#how-it-works">How it works</a>
-    <a href="#integrations">Integrations</a>
-    <a href="pricing.html">Pricing</a>
-    <hr/>
-    <a href="https://app.kelvex.io">Sign in</a>
-    <a href="demo.html" class="nav-demo drawer-demo">Request demo</a>
+</div></section>
+
+<section class="cta-band"><div class="wrap reveal">
+  <h2>See what Kelvex looks like for your sites.</h2>
+  <p class="lead center">Tell us what you run and we will walk you through it on your own equipment. No slides, no pressure, no long contract.</p>
+  <a href="company.html#request" class="btn btn-accent btn-lg">Request access</a>
+</div></section>
+
+<footer class="footer"><div class="wrap">
+  <div class="grid">
+    <div><a href="index.html" class="brand"><span class="dot"></span>Kelvex</a>
+      <p class="ft-d">The independent system of record and operations layer for mid-market cold storage refrigeration.</p></div>
+    <div><h4>Product</h4><a href="platform.html">Platform</a><a href="data.html">Data layer</a><a href="pricing.html">Pricing</a><a href="https://app.kelvex.io">Dashboard</a></div>
+    <div><h4>Company</h4><a href="company.html">About</a><a href="company.html#request">Request access</a><a href="mailto:ben@kelvex.io">Contact</a></div>
+    <div><h4>Connect</h4><a href="data.html">Integrations</a><a href="data.html">API</a><a href="mailto:ben@kelvex.io?subject=Partnership">Partnerships</a></div>
   </div>
-</header>
+  <div class="copy"><span>© 2026 Kelvex. All rights reserved.</span><span>Vendor-neutral · Read-only by default · Month to month</span></div>
+</div></footer>
 
-<!-- ── Hero ─────────────────────────────────────────────── -->
-<section class="hero">
-  <div class="container hero-layout">
-    <div class="hero-text">
-      <div class="eyebrow">Cold storage operations platform</div>
-      <h1>Know what's happening.<br>Before it costs you.</h1>
-      <p class="hero-p">
-        Kelvex connects to your existing compressor controllers and gives your team real-time visibility, automated alerts, and energy controls — without replacing any equipment.
-      </p>
-      <div class="hero-cta">
-        <a href="demo.html" class="btn-primary">Request a demo</a>
-        <a href="https://app.kelvex.io" class="btn-secondary">Sign into dashboard →</a>
-      </div>
-      <p class="hero-note">Used by cold storage operators managing 3 to 300 doors.</p>
-    </div>
-    <div class="hero-visual">
-      <div class="dashboard-window">
-        <div class="window-chrome">
-          <div class="chrome-dots"><span></span><span></span><span></span></div>
-          <div class="chrome-title">Fleet Overview — Kelvex</div>
-        </div>
-        <div class="window-body">
-          <div class="kpi-row">
-            <div class="kpi kpi-blue">
-              <div class="kpi-val">3</div>
-              <div class="kpi-lbl">Facilities</div>
-            </div>
-            <div class="kpi kpi-green">
-              <div class="kpi-val">97.4%</div>
-              <div class="kpi-lbl">Uptime</div>
-            </div>
-            <div class="kpi kpi-amber">
-              <div class="kpi-val">$41.2k</div>
-              <div class="kpi-lbl">Est. monthly bill</div>
-            </div>
-            <div class="kpi kpi-red">
-              <div class="kpi-val">2</div>
-              <div class="kpi-lbl">Active alerts</div>
-            </div>
-          </div>
-          <div class="alert-row">
-            <div class="alert-badge danger">● CRITICAL</div>
-            <div class="alert-msg">Compressor C-3 high discharge pressure — Warehouse A</div>
-            <div class="alert-time">4 min ago</div>
-          </div>
-          <div class="alert-row">
-            <div class="alert-badge warning">● HIGH</div>
-            <div class="alert-msg">Zone 7 temp drift above setpoint — Distribution B</div>
-            <div class="alert-time">12 min ago</div>
-          </div>
-          <div class="window-chart-label">Demand (kW) — last 7 days</div>
-          <div class="window-chart">
-            <div class="chart-line">
-              <svg viewBox="0 0 400 80" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stop-color="#0369EA" stop-opacity="0.15"/>
-                    <stop offset="100%" stop-color="#0369EA" stop-opacity="0"/>
-                  </linearGradient>
-                </defs>
-                <path d="M0,60 C40,55 60,45 100,40 C140,35 160,50 200,38 C240,26 260,42 300,30 C330,22 360,35 400,25" fill="url(#g1)" stroke="none"/>
-                <path d="M0,60 C40,55 60,45 100,40 C140,35 160,50 200,38 C240,26 260,42 300,30 C330,22 360,35 400,25" fill="none" stroke="#0369EA" stroke-width="2"/>
-                <line x1="290" y1="0" x2="290" y2="80" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
-                <text x="295" y="12" font-size="8" fill="#ef4444" opacity="0.8">Peak</text>
-              </svg>
-            </div>
-          </div>
-          <div class="mini-table">
-            <div class="mini-row header">
-              <span>Compressor</span><span>Discharge</span><span>Status</span>
-            </div>
-            <div class="mini-row">
-              <span>C-1 Rack A</span><span>182 psi</span><span class="status ok">Normal</span>
-            </div>
-            <div class="mini-row">
-              <span>C-3 Rack A</span><span>247 psi ↑</span><span class="status warn">Alert</span>
-            </div>
-            <div class="mini-row">
-              <span>C-5 Rack B</span><span>178 psi</span><span class="status ok">Normal</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── Metrics bar ───────────────────────────────────────── -->
-<section class="metrics-bar">
-  <div class="container metrics-grid">
-    <div class="metric">
-      <div class="metric-val">15–25%</div>
-      <div class="metric-lbl">typical reduction in monthly demand charges once energy controls are active</div>
-    </div>
-    <div class="metric-divider"></div>
-    <div class="metric">
-      <div class="metric-val">Near real-time</div>
-      <div class="metric-lbl">visibility across every facility, every zone, without new equipment</div>
-    </div>
-    <div class="metric-divider"></div>
-    <div class="metric">
-      <div class="metric-val">10+</div>
-      <div class="metric-lbl">controller brands supported, including the equipment already on your floor</div>
-    </div>
-    <div class="metric-divider"></div>
-    <div class="metric">
-      <div class="metric-val">Days</div>
-      <div class="metric-lbl">from first conversation to live data — not months, not a capital project</div>
-    </div>
-  </div>
-</section>
-
-<!-- ── Platform sections ─────────────────────────────────── -->
-<section class="platform" id="platform">
-
-  <div class="feature-block anim">
-    <div class="container feature-layout">
-      <div class="feature-text">
-        <div class="eyebrow eyebrow-blue">Live monitoring</div>
-        <h2>Every compressor. Every zone. One screen.</h2>
-        <p>Your team currently finds out about equipment problems the same way your customers do — when product temperature is already affected. Kelvex pushes alerts the moment sensors deviate, not after the fact.</p>
-        <ul class="feature-bullets">
-          <li>Discharge pressure, suction, oil temp, and amp draw tracked continuously</li>
-          <li>Zone temperature and humidity tracked against your setpoints</li>
-          <li>Door open events logged and alerted in real time</li>
-          <li>Configurable alert thresholds, escalation rules, and on-call routing</li>
-        </ul>
-      </div>
-      <div class="feature-visual">
-        <div class="visual-card">
-          <div class="vc-label">Compressor Health</div>
-          <div class="vc-comp-grid">
-            <div class="comp-tile green">
-              <div class="comp-name">C-1</div>
-              <div class="comp-metric">181 psi</div>
-              <div class="comp-sub">Normal</div>
-            </div>
-            <div class="comp-tile green">
-              <div class="comp-name">C-2</div>
-              <div class="comp-metric">176 psi</div>
-              <div class="comp-sub">Normal</div>
-            </div>
-            <div class="comp-tile red">
-              <div class="comp-name">C-3</div>
-              <div class="comp-metric">247 psi</div>
-              <div class="comp-sub">↑ High</div>
-            </div>
-            <div class="comp-tile green">
-              <div class="comp-name">C-4</div>
-              <div class="comp-metric">179 psi</div>
-              <div class="comp-sub">Normal</div>
-            </div>
-            <div class="comp-tile amber">
-              <div class="comp-name">C-5</div>
-              <div class="comp-metric">198 psi</div>
-              <div class="comp-sub">Watch</div>
-            </div>
-            <div class="comp-tile green">
-              <div class="comp-name">C-6</div>
-              <div class="comp-metric">182 psi</div>
-              <div class="comp-sub">Normal</div>
-            </div>
-          </div>
-          <div class="vc-alert-strip">
-            <span class="strip-dot red"></span>
-            C-3 discharge pressure 31% above normal — alert sent 4 min ago
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="feature-block feature-block-alt anim">
-    <div class="container feature-layout feature-layout-rev">
-      <div class="feature-visual">
-        <div class="visual-card">
-          <div class="vc-label">Demand Charge Breakdown — This Month</div>
-          <div class="demand-bars">
-            <div class="dbar-row">
-              <div class="dbar-name">Peak window</div>
-              <div class="dbar-track"><div class="dbar-fill red" style="width:78%"></div></div>
-              <div class="dbar-val">$12,400</div>
-            </div>
-            <div class="dbar-row">
-              <div class="dbar-name">Energy use</div>
-              <div class="dbar-track"><div class="dbar-fill blue" style="width:55%"></div></div>
-              <div class="dbar-val">$8,700</div>
-            </div>
-            <div class="dbar-row">
-              <div class="dbar-name">Transmission</div>
-              <div class="dbar-track"><div class="dbar-fill slate" style="width:32%"></div></div>
-              <div class="dbar-val">$5,100</div>
-            </div>
-          </div>
-          <div class="demand-insight">
-            <span class="insight-icon">💡</span>
-            <span>Pre-cooling before 4pm could reduce demand charge by ~$2,100/mo</span>
-          </div>
-        </div>
-      </div>
-      <div class="feature-text">
-        <div class="eyebrow eyebrow-amber">Energy optimization</div>
-        <h2>Stop paying for demand you don't understand.</h2>
-        <p>Demand charges can represent 40% of your utility bill — and most operators have no idea which equipment is setting their peak or when it's happening. Kelvex shows you exactly where the money is going and automates the controls that reduce it.</p>
-        <ul class="feature-bullets">
-          <li>Real-time demand tracked against your tariff structure</li>
-          <li>Automated pre-cooling before peak rate windows</li>
-          <li>Load controls triggered on demand thresholds</li>
-          <li>Monthly cost trending across your entire portfolio</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <div class="feature-block anim">
-    <div class="container feature-layout">
-      <div class="feature-text">
-        <div class="eyebrow eyebrow-green">Compliance</div>
-        <h2>Audit-ready logs, automatically.</h2>
-        <p>FDA, USDA, and HACCP temperature records don't need to be a manual process. Kelvex logs everything continuously and generates formatted reports on demand — so your team isn't spending hours pulling data when an inspector shows up.</p>
-        <ul class="feature-bullets">
-          <li>Continuous temperature logs with no gaps or manual entries</li>
-          <li>One-click report generation for any date range and zone</li>
-          <li>Full excursion history with timestamps and cause data</li>
-          <li>Configurable alarm thresholds per zone and zone type</li>
-        </ul>
-      </div>
-      <div class="feature-visual">
-        <div class="visual-card">
-          <div class="vc-label">Temperature Log — Freezer Zone 4</div>
-          <div class="log-table">
-            <div class="log-row log-hdr">
-              <span>Time</span><span>Temp (°F)</span><span>Status</span>
-            </div>
-            <div class="log-row"><span>06:00</span><span>-8.2°</span><span class="log-ok">✓ In range</span></div>
-            <div class="log-row"><span>07:00</span><span>-7.9°</span><span class="log-ok">✓ In range</span></div>
-            <div class="log-row log-exc"><span>08:14</span><span>+4.1°</span><span class="log-err">⚠ Excursion</span></div>
-            <div class="log-row log-exc"><span>09:00</span><span>+6.3°</span><span class="log-err">⚠ Excursion</span></div>
-            <div class="log-row"><span>10:00</span><span>-6.1°</span><span class="log-ok">✓ Recovered</span></div>
-            <div class="log-row"><span>11:00</span><span>-8.8°</span><span class="log-ok">✓ In range</span></div>
-          </div>
-          <div class="log-footer">
-            <span>1 excursion event · Root cause: door held open 46 min</span>
-            <a class="log-export" href="#">Export PDF →</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── Quote ─────────────────────────────────────────────── -->
-<section class="quote-section">
-  <div class="container">
-    <blockquote class="anim">
-      <p>"We were flying blind. We knew our energy bills were too high but had no idea which compressors were running inefficiently or when our peak demand was occurring. Within a week of installing Kelvex we identified two machines that were responsible for a third of our demand charge."</p>
-      <footer>
-        <div class="quote-avatar">DC</div>
-        <div>
-          <div class="quote-name">Director of Operations</div>
-          <div class="quote-company">Midwest Cold Storage Operator · 4 facilities</div>
-        </div>
-      </footer>
-    </blockquote>
-  </div>
-</section>
-
-<!-- ── How it works ──────────────────────────────────────── -->
-<section class="how-section" id="how-it-works">
-  <div class="container">
-    <div class="how-header anim">
-      <div class="eyebrow">Setup</div>
-      <h2>Up and running without the integration project.</h2>
-      <p>No new wiring. No replacement equipment. No contractors. We connect to what's already on your floor.</p>
-    </div>
-    <div class="steps-row">
-      <div class="step-card anim" style="transition-delay:0s">
-        <div class="step-num">1</div>
-        <h3>We get you connected</h3>
-        <p>Kelvex handles the connection to your existing equipment. No contractors, no new hardware purchases, no rip-and-replace.</p>
-      </div>
-      <div class="step-arrow">→</div>
-      <div class="step-card anim" style="transition-delay:0.1s">
-        <div class="step-num">2</div>
-        <h3>Your data, live</h3>
-        <p>Your compressors, zones, and energy data appear in your dashboard. We configure it with you — your team doesn't need to be technical.</p>
-      </div>
-      <div class="step-arrow">→</div>
-      <div class="step-card anim" style="transition-delay:0.2s">
-        <div class="step-num">3</div>
-        <h3>Alerts, controls, reports</h3>
-        <p>Set your thresholds, add your team, and turn on the controls that matter. Most customers are operational within the same week.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── Integrations ──────────────────────────────────────── -->
-<section class="integ-section" id="integrations">
-  <div class="container">
-    <div class="integ-header anim">
-      <div class="eyebrow">Integrations</div>
-      <h2>Works with what's already on your floor.</h2>
-      <p>Cold storage runs on equipment that has been in place for years. Kelvex connects to it without replacement, custom firmware, or new wiring.</p>
-    </div>
-    <div class="integ-table anim">
-      <div class="integ-row">
-        <div class="integ-item">
-          <div class="integ-check">✓</div>
-          <div>
-            <div class="integ-name">Emerson E2</div>
-            <div class="integ-kind">Rack Controller</div>
-          </div>
-        </div>
-        <div class="integ-item">
-          <div class="integ-check">✓</div>
-          <div>
-            <div class="integ-name">Danfoss AK-SC 255</div>
-            <div class="integ-kind">System Controller</div>
-          </div>
-        </div>
-        <div class="integ-item">
-          <div class="integ-check">✓</div>
-          <div>
-            <div class="integ-name">Modbus TCP/RTU</div>
-            <div class="integ-kind">Protocol</div>
-          </div>
-        </div>
-        <div class="integ-item">
-          <div class="integ-check">✓</div>
-          <div>
-            <div class="integ-name">BACnet/IP</div>
-            <div class="integ-kind">Protocol</div>
-          </div>
-        </div>
-      </div>
-      <div class="integ-row">
-        <div class="integ-item">
-          <div class="integ-check">✓</div>
-          <div>
-            <div class="integ-name">Honeywell</div>
-            <div class="integ-kind">Building Management</div>
-          </div>
-        </div>
-        <div class="integ-item">
-          <div class="integ-check">✓</div>
-          <div>
-            <div class="integ-name">Copeland Scroll</div>
-            <div class="integ-kind">Compressor</div>
-          </div>
-        </div>
-        <div class="integ-item">
-          <div class="integ-check soon">→</div>
-          <div>
-            <div class="integ-name">Allen-Bradley</div>
-            <div class="integ-kind">PLC · Coming soon</div>
-          </div>
-        </div>
-        <div class="integ-item">
-          <div class="integ-check">✓</div>
-          <div>
-            <div class="integ-name">OpenEI Tariffs</div>
-            <div class="integ-kind">Energy Rate Database</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <p class="integ-footer">Running something not on this list? <a href="mailto:ben@kelvex.io">Tell us what you have →</a></p>
-  </div>
-</section>
-
-<!-- ── Contact / CTA ─────────────────────────────────────── -->
-<section class="cta-section" id="contact">
-  <div class="container cta-inner">
-    <div class="cta-text anim">
-      <div class="eyebrow">Get started</div>
-      <h2>See your facilities the way they actually are.</h2>
-      <p>Tell us about your operation. We'll show you exactly what Kelvex looks like for your facilities — no generic slides.</p>
-      <ul class="cta-trust">
-        <li>Response within one business day</li>
-        <li>Walkthrough tailored to your equipment type</li>
-        <li>No long-term contract required to get started</li>
-      </ul>
-    </div>
-    <div class="cta-form-wrap anim" style="transition-delay:0.1s">
-      <!-- Sign up at formspree.io and replace FORM_ID with your form's ID -->
-      <form class="contact-form" id="contact-form" action="https://formspree.io/f/FORM_ID" method="POST">
-        <div class="form-row">
-          <div class="form-field">
-            <label for="cf-name">Your name</label>
-            <input id="cf-name" type="text" name="name" placeholder="Jane Smith" required />
-          </div>
-          <div class="form-field">
-            <label for="cf-email">Work email</label>
-            <input id="cf-email" type="email" name="email" placeholder="jane@company.com" required />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-field">
-            <label for="cf-company">Company</label>
-            <input id="cf-company" type="text" name="company" placeholder="Cold Storage Co." required />
-          </div>
-          <div class="form-field">
-            <label for="cf-facilities">Number of facilities</label>
-            <select id="cf-facilities" name="facilities">
-              <option value="">Select...</option>
-              <option value="1">1</option>
-              <option value="2-5">2–5</option>
-              <option value="6-20">6–20</option>
-              <option value="20+">20+</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-field">
-          <label for="cf-challenge">What's your biggest challenge right now? <span class="optional">(optional)</span></label>
-          <textarea id="cf-challenge" name="challenge" placeholder="e.g. We have no visibility into compressor health, our energy bills keep climbing..." rows="3"></textarea>
-        </div>
-        <button type="submit" class="btn-primary btn-full">Request a demo →</button>
-        <p class="form-note">We respond within one business day.</p>
-      </form>
-    </div>
-  </div>
-</section>
-
-<!-- ── Footer ────────────────────────────────────────────── -->
-<footer class="footer">
-  <div class="container footer-inner">
-    <div class="footer-brand">
-      <a href="/" class="nav-logo" style="color:#0f172a;">
-        <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-          <rect width="28" height="28" rx="7" fill="#0f172a"/>
-          <path d="M4 14L7.5 14L10 8L14 20L18 8L20.5 14L24 14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        Kelvex
-      </a>
-      <p>The operating system for cold storage facilities.</p>
-    </div>
-    <div class="footer-cols">
-      <div class="footer-col">
-        <div class="footer-col-head">Product</div>
-        <a href="#platform">Platform</a>
-        <a href="#how-it-works">How it works</a>
-        <a href="#integrations">Integrations</a>
-        <a href="pricing.html">Pricing</a>
-        <a href="https://app.kelvex.io">Dashboard</a>
-      </div>
-      <div class="footer-col">
-        <div class="footer-col-head">Company</div>
-        <a href="demo.html">Book a demo</a>
-        <a href="#contact">Contact</a>
-        <a href="mailto:ben@kelvex.io?subject=Partnership">Partnerships</a>
-      </div>
-    </div>
-  </div>
-  <div class="container footer-bar">
-    <p>© 2025 Kelvex. All rights reserved.</p>
-    <p><a href="mailto:ben@kelvex.io">ben@kelvex.io</a></p>
-  </div>
-</footer>
-
-<script>
-// Nav scroll effect
-const nav = document.getElementById('nav')
-const hamburger = document.getElementById('hamburger')
-const drawer = document.getElementById('drawer')
-
-window.addEventListener('scroll', () => {
-  nav.classList.toggle('nav-solid', window.scrollY > 40)
-})
-
-hamburger.addEventListener('click', () => {
-  drawer.classList.toggle('open')
-})
-
-drawer.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-  drawer.classList.remove('open')
-}))
-
-// Scroll animations
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible')
-      observer.unobserve(entry.target)
-    }
-  })
-}, { threshold: 0.08 })
-
-document.querySelectorAll('.anim').forEach(el => observer.observe(el))
-
-// Contact form — inline submission via Formspree
-const form = document.getElementById('contact-form')
-if (form) {
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const btn = form.querySelector('[type="submit"]')
-    const orig = btn.textContent
-    btn.textContent = 'Sending...'
-    btn.disabled = true
-    try {
-      const res = await fetch(form.action, {
-        method: 'POST',
-        body: new FormData(form),
-        headers: { Accept: 'application/json' }
-      })
-      if (res.ok) {
-        form.innerHTML = '<div class="form-success"><div class="form-success-icon">✓</div><h3>We\'ll be in touch soon.</h3><p>Expect a reply within one business day. In the meantime, feel free to <a href="https://app.kelvex.io">sign in to your dashboard</a> if you already have an account.</p></div>'
-      } else {
-        btn.textContent = orig
-        btn.disabled = false
-      }
-    } catch {
-      btn.textContent = orig
-      btn.disabled = false
-    }
-  })
-}
-</script>
+<script>(function(){if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});document.querySelectorAll('.reveal').forEach(function(el){if(!el.classList.contains('in'))io.observe(el)})})();</script>
 </body>
 </html>

@@ -40,6 +40,8 @@ const LiveMonitorPage = lazy(() => import('./pages/LiveMonitorPage'))
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage'))
 const AlertRulesPage = lazy(() => import('./pages/AlertRulesPage'))
 const ReportsPage = lazy(() => import('./pages/ReportsPage'))
+const DocumentsPage = lazy(() => import('./pages/DocumentsPage'))
+const ControllerAccessPage = lazy(() => import('./pages/ControllerAccessPage'))
 const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
 const LeakTrackingPage = lazy(() => import('./pages/LeakTrackingPage'))
@@ -143,9 +145,9 @@ function AppRoutes() {
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="refrigerant" element={<LeakTrackingPage />} />
         <Route path="maintenance" element={<MaintenancePage />} />
-        <Route path="documents" element={<ReportsPage />} />
+        <Route path="documents" element={<DocumentsPage />} />
         <Route path="reports" element={<ReportsPage />} />
-        <Route path="tunnel" element={<ControlsPage />} />
+        <Route path="tunnel" element={<ControllerAccessPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="admin" element={<OnboardingPage />} />
 

@@ -83,7 +83,7 @@ export default function FinanceHome() {
       facilities.map(f => api.listBills(f.id).then(r => r.bills).catch(() => [] as Bill[]))
     ).then(results => {
       setBills(results.flat())
-    }).finally(() => setLoaded(false ? true : setLoaded(true) as unknown as boolean))
+    }).finally(() => setLoaded(true))
   }, [facilities])
 
   if (!loaded) return <LoadingState />

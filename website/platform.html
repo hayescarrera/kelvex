@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform — Kelvex</title>
+<meta name="description" content="The Kelvex platform: a permanent system of record, reach into every site and brand of controller, automatic refrigerant and compliance records, and an operations layer your whole team works from.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="nav"><div class="wrap">
+  <a href="index.html" class="brand"><span class="dot"></span>Kelvex</a>
+  <div class="navlinks">
+    <a href="platform.html" class="active">Platform</a><a href="data.html">Data layer</a><a href="pricing.html">Pricing</a><a href="company.html">Company</a>
+  </div>
+  <div class="navcta"><a href="https://app.kelvex.io" class="btn">Sign in</a><a href="company.html#request" class="btn btn-accent">Request access</a></div>
+</div></nav>
+
+<header class="phero"><div class="wrap reveal in">
+  <span class="eyebrow">The platform</span>
+  <h1>One view of every site, and the proof to back it up.</h1>
+  <p class="lead">Kelvex is read-only, vendor-neutral, and built to sit above whatever controls you already run. Four things make it the layer your equipment was never going to be on its own.</p>
+</div></header>
+
+<section class="section"><div class="wrap split">
+  <div class="reveal col-text">
+    <span class="eyebrow">Record</span>
+    <h2>A history that outlives the box on the wall.</h2>
+    <p class="lead" style="margin-top:18px">Site controllers overwrite their own data within days, so the moment that mattered is usually gone before anyone looks. Kelvex keeps every reading for years and makes it provable. When a customer disputes a load or an auditor wants records, you produce a single export that shows any site stayed in range across whatever window they ask for.</p>
+  </div>
+  <div class="reveal">
+    <div class="panel"><div class="panel-bar"><span class="t">Cold-chain export</span><span class="live"><span class="pulse"></span>READY</span></div>
+      <div class="panel-body">
+        <div class="rows">
+          <div class="row"><span class="site">DC-North · Cooler 2</span><span class="val">Jan–Jun 2026</span><span class="tag tag-ok">In range</span></div>
+          <div class="row"><span class="site">Cold Store 04 · Freezer</span><span class="val">Jan–Jun 2026</span><span class="tag tag-ok">In range</span></div>
+          <div class="row"><span class="site">Blast-2 · Tunnel</span><span class="val">Jan–Jun 2026</span><span class="tag tag-watch">2 excursions</span></div>
+        </div>
+        <div class="logline">Export · 14 months · 11 sites · PDF and CSV · generated in 3s</div>
+      </div></div>
+  </div>
+</div></section>
+
+<section class="section alt"><div class="wrap split rev">
+  <div class="reveal col-text">
+    <span class="eyebrow">Reach</span>
+    <h2>Every site you run, even the awkward ones.</h2>
+    <p class="lead" style="margin-top:18px">A portfolio grown by acquisition runs a modern supervisor at one site and an older or standalone controller at the next. Kelvex reads all of them, including the older and harder-to-reach sites a single manufacturer's cloud cannot see. Locations with no on-site IT come online quickly, with nothing for your team to stand up.</p>
+  </div>
+  <div class="reveal">
+    <div class="panel"><div class="panel-bar"><span class="t">Connected sites</span><span class="live"><span class="pulse"></span>LIVE</span></div>
+      <div class="panel-body"><div class="rows">
+        <div class="row"><span class="site"><span class="sdot s-ok"></span>DC-North</span><span class="val">Danfoss AK-SM</span><span class="tag tag-ok">Direct</span></div>
+        <div class="row"><span class="site"><span class="sdot s-ok"></span>Cold Store 04</span><span class="val">Copeland E3</span><span class="tag tag-ok">Direct</span></div>
+        <div class="row"><span class="site"><span class="sdot s-ok"></span>Blast-2</span><span class="val">standalone ctrl.</span><span class="tag tag-ok">Agent</span></div>
+        <div class="row"><span class="site"><span class="sdot s-ok"></span>Annex (acquired)</span><span class="val">mechanical</span><span class="tag tag-ok">Agent</span></div>
+      </div></div></div>
+  </div>
+</div></section>
+
+<section class="section"><div class="wrap split">
+  <div class="reveal col-text">
+    <span class="eyebrow">Refrigerant and compliance</span>
+    <h2>The record builds itself as the work happens.</h2>
+    <p class="lead" style="margin-top:18px">Leak rates calculate automatically, every refrigerant add ties back to its repair record, and an AIM-Act-ready log fills in as technicians work. You see a system losing charge as a trend and a dollar figure long before it becomes a surprise invoice, and when an inspector asks, the report is one click instead of a week of compiling spreadsheets.</p>
+  </div>
+  <div class="reveal">
+    <div class="gauge">
+      <div class="glabel">Leak rate against AIM-Act threshold</div>
+      <div class="grow"><span class="gname">Cold Store 04 · Rack B</span><span class="gval" style="color:var(--crit)">18.4%</span></div>
+      <div class="bar"><div class="fill" style="width:74%;background:var(--crit)"></div><div class="thresh" style="left:40%"></div></div>
+      <div class="grow"><span class="gname">DC-North · Rack A</span><span class="gval" style="color:var(--warn)">9.2%</span></div>
+      <div class="bar"><div class="fill" style="width:37%;background:var(--warn)"></div><div class="thresh" style="left:40%"></div></div>
+      <div class="grow"><span class="gname">DC-South · Warehouse</span><span class="gval" style="color:var(--ok)">4.1%</span></div>
+      <div class="bar"><div class="fill" style="width:16%;background:var(--ok)"></div><div class="thresh" style="left:40%"></div></div>
+      <div class="note">Marker shows the reportable threshold. One site is over, and its record is export ready.</div>
+    </div>
+  </div>
+</div></section>
+
+<section class="section alt" id="operations"><div class="wrap split rev">
+  <div class="reveal col-text">
+    <span class="eyebrow">Operations</span>
+    <h2>Run the operation, not just watch it.</h2>
+    <p class="lead" style="margin-top:18px">Monitoring tells you something is wrong. Kelvex is where your team works through it. Operators, technicians, and finance each open to the view that fits their job while sharing one record. Alerts are tuned to tell a real fault from a routine defrost, so the ones that reach your team are worth acting on. A technician logs a refrigerant add or a repair from a phone in the engine room in seconds, and the same screen shows what the plant actually costs to run once you add your power bills.</p>
+  </div>
+  <div class="reveal">
+    <div class="panel"><div class="panel-bar"><span class="t">Operations</span><span class="live"><span class="pulse"></span>LIVE</span></div>
+      <div class="panel-body">
+        <div class="kpis">
+          <div class="kpi"><div class="v">3</div><div class="l">Open work items</div></div>
+          <div class="kpi"><div class="v">42<span style="font-size:12px"> lbs</span></div><div class="l">Refrigerant, Apr</div></div>
+          <div class="kpi"><div class="v">$18.2k</div><div class="l">Energy, MTD</div></div>
+        </div>
+        <div class="rows">
+          <div class="row"><span class="site"><span class="sdot s-crit"></span>Cold Store 04 · Rack B</span><span class="val">charge loss</span><span class="act">Log repair</span></div>
+          <div class="row"><span class="site"><span class="sdot s-watch"></span>Blast-2 · Compressor 3</span><span class="val">short-cycling</span><span class="act">Acknowledge</span></div>
+          <div class="row"><span class="site"><span class="sdot s-ok"></span>DC-North · Defrost cycle</span><span class="val">cleared</span><span class="act" style="color:var(--muted)">Resolved</span></div>
+        </div>
+        <div class="logline">Maintenance · R-448A add, 8 lbs · J. Alvarez · linked to alert 4471 · 2h ago</div>
+      </div></div>
+  </div>
+</div></section>
+
+<section class="section"><div class="wrap">
+  <div class="section-head reveal"><span class="eyebrow">Getting started</span><h2>Live in days, and your team never picks up a wrench.</h2></div>
+  <div class="steps reveal">
+    <div class="step"><div class="num">STEP 01</div><h3>We map your sites with you</h3><p>After a short survey of your equipment and locations, we handle the protocols and mapping ourselves. Your team configures nothing.</p></div>
+    <div class="step"><div class="num">STEP 02</div><h3>We bring every site online</h3><p>Including the older and harder-to-reach ones, with little or no lift from your team. Most sites are sending live data within the same week.</p></div>
+    <div class="step"><div class="num">STEP 03</div><h3>You run it day to day</h3><p>Once setup is done, Kelvex is yours to operate and we stay close by. The record builds on its own and the exports are always one click away.</p></div>
+  </div>
+</div></section>
+
+<section class="cta-band"><div class="wrap reveal">
+  <h2>Walk your own sites with us.</h2>
+  <p class="lead center">We will show you exactly what Kelvex looks like for the equipment you actually run.</p>
+  <a href="company.html#request" class="btn btn-accent btn-lg">Request access</a>
+</div></section>
+
+<footer class="footer"><div class="wrap">
+  <div class="grid">
+    <div><a href="index.html" class="brand"><span class="dot"></span>Kelvex</a><p class="ft-d">The independent system of record and operations layer for mid-market cold storage refrigeration.</p></div>
+    <div><h4>Product</h4><a href="platform.html">Platform</a><a href="data.html">Data layer</a><a href="pricing.html">Pricing</a><a href="https://app.kelvex.io">Dashboard</a></div>
+    <div><h4>Company</h4><a href="company.html">About</a><a href="company.html#request">Request access</a><a href="mailto:ben@kelvex.io">Contact</a></div>
+    <div><h4>Connect</h4><a href="data.html">Integrations</a><a href="data.html">API</a><a href="mailto:ben@kelvex.io?subject=Partnership">Partnerships</a></div>
+  </div>
+  <div class="copy"><span>© 2026 Kelvex. All rights reserved.</span><span>Vendor-neutral · Read-only by default · Month to month</span></div>
+</div></footer>
+
+<script>(function(){if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});document.querySelectorAll('.reveal').forEach(function(el){if(!el.classList.contains('in'))io.observe(el)})})();</script>
+</body>
+</html>
