@@ -24,6 +24,8 @@ from app.api.v1.maintenance import router as maintenance_router
 from app.api.v1.escalation import router as escalation_router
 from app.api.v1.refrigerant import router as refrigerant_router
 from app.api.v1.detection import router as detection_router
+from app.api.v1.documents import router as documents_router
+from app.api.v1.tunnel import router as tunnel_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -54,3 +56,5 @@ api_router.include_router(maintenance_router)
 api_router.include_router(escalation_router)
 api_router.include_router(refrigerant_router)
 api_router.include_router(detection_router)
+api_router.include_router(documents_router)
+api_router.include_router(tunnel_router)
