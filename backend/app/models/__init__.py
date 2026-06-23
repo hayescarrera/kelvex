@@ -27,6 +27,7 @@ from app.models.document import Document
 from app.models.tunnel import TunnelSession
 from app.models.maintenance_event import MaintenanceEvent
 from app.models.leak_rate import LeakRateRecord
+from app.models.notification_policy import NotificationPolicy
 
 __all__ = [
     "User",
@@ -82,4 +83,5 @@ __all__ = [
     "TunnelSession",
     "MaintenanceEvent",
     "LeakRateRecord",
+    "NotificationPolicy",
 ]

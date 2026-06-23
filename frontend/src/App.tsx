@@ -42,6 +42,7 @@ const AlertRulesPage = lazy(() => import('./pages/AlertRulesPage'))
 const ReportsPage = lazy(() => import('./pages/ReportsPage'))
 const DocumentsPage = lazy(() => import('./pages/DocumentsPage'))
 const ControllerAccessPage = lazy(() => import('./pages/ControllerAccessPage'))
+const NotificationSettingsPage = lazy(() => import('./pages/NotificationSettingsPage'))
 const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
 const LeakTrackingPage = lazy(() => import('./pages/LeakTrackingPage'))
@@ -149,6 +150,7 @@ function AppRoutes() {
         <Route path="reports" element={<ReportsPage />} />
         <Route path="tunnel" element={<ControllerAccessPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings/notifications" element={<NotificationSettingsPage />} />
         <Route path="admin" element={<OnboardingPage />} />
 
         {/* Legacy paths — keep working */}

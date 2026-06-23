@@ -26,6 +26,7 @@ from app.api.v1.refrigerant import router as refrigerant_router
 from app.api.v1.detection import router as detection_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.tunnel import router as tunnel_router
+from app.api.v1.notification_policies import router as notification_policies_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -58,3 +59,4 @@ api_router.include_router(refrigerant_router)
 api_router.include_router(detection_router)
 api_router.include_router(documents_router)
 api_router.include_router(tunnel_router)
+api_router.include_router(notification_policies_router)

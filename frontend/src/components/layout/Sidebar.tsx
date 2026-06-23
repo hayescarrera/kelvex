@@ -95,6 +95,7 @@ function buildNavItems(
 
   const settingsItems: NavItem[] = [
     { to: '/settings', icon: <Settings size={16} />, label: 'Settings' },
+    { to: '/settings/notifications', icon: <Bell size={16} />, label: 'Notifications' },
   ]
 
   if (role === 'kelvex_admin') {

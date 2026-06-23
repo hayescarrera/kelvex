@@ -607,6 +607,27 @@ class ApiClient {
     return this.request<{ logs: NotificationLogRecord[]; total: number }>(`/notifications/logs?limit=${limit}`)
   }
 
+  // ── Notification Policies ─────────────────────
+  async listNotificationPolicies(mineOnly = true) {
+    return this.request<{ policies: NotificationPolicy[]; total: number }>(`/notifications/policies?mine_only=${mineOnly}`)
+  }
+
+  async createNotificationPolicy(data: NotificationPolicyCreate) {
+    return this.request<NotificationPolicy>('/notifications/policies', { method: 'POST', body: data })
+  }
+
+  async updateNotificationPolicy(id: string, data: Partial<NotificationPolicyCreate>) {
+    return this.request<NotificationPolicy>(`/notifications/policies/${id}`, { method: 'PATCH', body: data })
+  }
+
+  async deleteNotificationPolicy(id: string) {
+    return this.request(`/notifications/policies/${id}`, { method: 'DELETE' })
+  }
+
+  async testNotificationPolicy(id: string) {
+    return this.request<{ status: string }>(`/notifications/policies/${id}/test`, { method: 'POST' })
+  }
+
   // ── Reports ───────────────────────────────────
   async getPowerReport(facilityId: string, params?: { start?: string; end?: string; interval?: string }) {
     const query = new URLSearchParams()
@@ -1697,6 +1718,51 @@ export interface NotificationChannelCreate {
   facility_ids?: string[] | null
   min_severity?: string | null
   categories?: string[] | null
+}
+
+export interface NotificationPolicy {
+  id: string
+  org_id: string
+  user_id: string | null
+  name: string
+  facility_ids: string[] | null
+  categories: string[] | null
+  min_severity: string
+  channel_ids: string[] | null
+  quiet_hours_enabled: boolean
+  quiet_hours_start: number
+  quiet_hours_end: number
+  quiet_hours_bypass_severity: string | null
+  cooldown_minutes: number
+  digest_mode: boolean
+  digest_interval_hours: number
+  escalation_enabled: boolean
+  escalation_delay_minutes: number
+  escalation_channel_ids: string[] | null
+  escalation_min_severity: string
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface NotificationPolicyCreate {
+  name?: string
+  facility_ids?: string[] | null
+  categories?: string[] | null
+  min_severity?: string
+  channel_ids?: string[] | null
+  quiet_hours_enabled?: boolean
+  quiet_hours_start?: number
+  quiet_hours_end?: number
+  quiet_hours_bypass_severity?: string | null
+  cooldown_minutes?: number
+  digest_mode?: boolean
+  digest_interval_hours?: number
+  escalation_enabled?: boolean
+  escalation_delay_minutes?: number
+  escalation_channel_ids?: string[] | null
+  escalation_min_severity?: string
+  enabled?: boolean
 }
 
 export interface NotificationLogRecord {

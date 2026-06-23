@@ -26,6 +26,7 @@ from app.schemas.alert import (
     EventResponse, EventListResponse,
 )
 from app.api.v1.events import publish_event
+from app.services.alert_dispatch import dispatch_alert_notifications, cancel_escalation
 
 router = APIRouter(tags=["alerts"])
 
@@ -56,6 +57,7 @@ async def create_alert(
 ):
     """Create a new alert for a facility."""
     await _get_facility(facility_id, current_user, db)
+    facility = await _get_facility(facility_id, current_user, db)
     alert = Alert(facility_id=facility_id, **data.model_dump())
     db.add(alert)
     await db.flush()
@@ -64,6 +66,11 @@ async def create_alert(
         "id": str(alert.id), "severity": alert.severity,
         "title": alert.title, "facility_id": str(facility_id),
     })
+    # Fire notifications — non-blocking, errors logged internally
+    try:
+        await dispatch_alert_notifications(db, alert, facility)
+    except Exception:
+        pass
     return alert
 
 
@@ -138,23 +145,35 @@ async def update_alert(
         raise HTTPException(status_code=404, detail="Alert not found")
 
     now = datetime.now(timezone.utc)
+    transitioning_out = False
     if data.state == "acknowledged" and alert.state == "active":
         alert.state = "acknowledged"
         alert.acknowledged_by = current_user.id
         alert.acknowledged_at = now
+        transitioning_out = True
     elif data.state == "resolved":
         alert.state = "resolved"
         alert.resolved_by = current_user.id
         alert.resolved_at = now
         if data.resolution_note:
             alert.resolution_note = data.resolution_note
+        transitioning_out = True
     elif data.state == "suppressed":
         alert.state = "suppressed"
+        transitioning_out = True
     elif data.state:
         raise HTTPException(status_code=400, detail=f"Invalid state transition to {data.state}")
 
     await db.flush()
     await db.refresh(alert)
+
+    # Cancel pending escalation tasks when alert is no longer active
+    if transitioning_out:
+        try:
+            await cancel_escalation(alert.id)
+        except Exception:
+            pass
+
     return alert
 
 
