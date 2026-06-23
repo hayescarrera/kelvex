@@ -58,6 +58,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - documents_data:/data/documents
     expose:
       - "8000"
     command: >
@@ -114,5 +116,6 @@ services:
 volumes:
   pg_data:
   redis_data:
+  documents_data:
   certbot_www:
   certbot_conf:

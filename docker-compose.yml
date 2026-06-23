@@ -24,6 +24,8 @@ services:
         condition: service_healthy
     command: bash start.sh
     restart: unless-stopped
+    volumes:
+      - documents_data:/data/documents
 
   db:
     image: timescale/timescaledb:latest-pg16
@@ -70,3 +72,4 @@ services:
 
 volumes:
   pgdata:
+  documents_data:

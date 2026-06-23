@@ -61,6 +61,7 @@ class Settings(BaseSettings):
 
     # File uploads
     MAX_UPLOAD_SIZE_MB: int = 50
+    UPLOAD_DIR: str = "/data/documents"
 
     class Config:
         env_file = ".env"
@@ -79,6 +80,13 @@ class Settings(BaseSettings):
 
         if is_production and not self.CREDENTIAL_ENCRYPTION_KEY:
             raise ValueError("CREDENTIAL_ENCRYPTION_KEY is required in production")
+
+        if is_production and self.CORS_ORIGINS in {
+            "http://localhost:5173,http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:3000",
+        }:
+            raise ValueError("CORS_ORIGINS must be set to production origins, not localhost")
 
         return self
 

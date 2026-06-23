@@ -7,7 +7,6 @@ Endpoints:
   DELETE /documents/{id}         — Delete document record and file
 """
 
-import os
 import uuid
 import aiofiles
 from pathlib import Path
@@ -17,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
@@ -26,7 +26,6 @@ from app.services.audit_service import log_activity
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
-UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/data/documents"))
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
 ALLOWED_TYPES = {
@@ -105,16 +104,20 @@ async def upload_document(
         await _verify_facility(facility_id, current_user, db)
 
     content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="File exceeds 50 MB limit")
+    settings = get_settings()
+    upload_dir = Path(settings.UPLOAD_DIR)
+    max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"File exceeds {settings.MAX_UPLOAD_SIZE_MB} MB limit")
 
     file_id = uuid.uuid4()
-    org_dir = UPLOAD_DIR / str(current_user.org_id)
+    org_dir = upload_dir / str(current_user.org_id)
     org_dir.mkdir(parents=True, exist_ok=True)
 
     ext = Path(file.filename or "").suffix
     storage_key = f"{current_user.org_id}/{file_id}{ext}"
-    dest = UPLOAD_DIR / storage_key
+    dest = upload_dir / storage_key
 
     async with aiofiles.open(dest, "wb") as f:
         await f.write(content)
@@ -160,7 +163,8 @@ async def delete_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    dest = UPLOAD_DIR / doc.storage_key
+    upload_dir = Path(get_settings().UPLOAD_DIR)
+    dest = upload_dir / doc.storage_key
     if dest.exists():
         dest.unlink(missing_ok=True)
 
