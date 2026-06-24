@@ -2,11 +2,14 @@ import { useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import {
   Users, UserPlus, Shield, Building2, ChevronDown,
-  MoreVertical, X, Check, Eye, EyeOff,
+  MoreVertical, X, Check, EyeOff, Mail, Clock, Trash2,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSiteContext } from '../contexts/SiteContext'
-import { useOrgMembers, useInviteMember, useUpdateMember, useRemoveMember } from '../hooks/useMembers'
+import {
+  useOrgMembers, useSendInvite, useUpdateMember, useRemoveMember,
+  usePendingInvites, useRevokeInvite,
+} from '../hooks/useMembers'
 import LoadingState from '../components/ui/LoadingState'
 import {
   ROLE_LABELS, ROLE_ORDER, GLOBAL_ACCESS_ROLES,
@@ -29,30 +32,19 @@ function roleBadgeClass(role: UserRole): string {
 // ── Invite Modal ────────────────────────────────
 function InviteModal({ onClose }: { onClose: () => void }) {
   const { facilities } = useSiteContext()
-  const invite = useInviteMember()
+  const sendInvite = useSendInvite()
   const [email, setEmail] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [password, setPassword] = useState('')
   const [role, setRole] = useState<UserRole>('operator')
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([])
-  const [showPassword, setShowPassword] = useState(false)
 
   const needsFacilityAccess = !GLOBAL_ACCESS_ROLES.includes(role)
+  const assignableRoles = ROLE_ORDER.filter(r => r !== 'owner')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    invite.mutate(
-      {
-        email,
-        full_name: fullName,
-        password,
-        role,
-        facility_ids: needsFacilityAccess ? selectedFacilities : [],
-      },
-      {
-        onSuccess: () => { toast.success('Invite sent'); onClose() },
-        onError: () => toast.error('Failed to send invite'),
-      }
+    sendInvite.mutate(
+      { email, role, facility_ids: needsFacilityAccess ? selectedFacilities : [] },
+      { onSuccess: () => onClose() },
     )
   }
 
@@ -61,9 +53,6 @@ function InviteModal({ onClose }: { onClose: () => void }) {
       prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]
     )
   }
-
-  // Can't assign owner role through invite
-  const assignableRoles = ROLE_ORDER.filter(r => r !== 'owner')
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -76,36 +65,20 @@ function InviteModal({ onClose }: { onClose: () => void }) {
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            <div className="form-group">
-              <label className="form-label">Full Name</label>
-              <input className="form-input" value={fullName} onChange={e => setFullName(e.target.value)} required placeholder="Jane Smith" />
-            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 0 }}>
+              They'll receive an email with a link to set their name and password.
+            </p>
             <div className="form-group">
               <label className="form-label">Email</label>
-              <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="jane@company.com" />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Temporary Password</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  className="form-input"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  placeholder="Min 8 characters"
-                  style={{ paddingRight: 40 }}
-                />
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)' }}
-                >
-                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
+              <input
+                className="form-input"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoFocus
+                placeholder="jane@company.com"
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Role</label>
@@ -117,7 +90,7 @@ function InviteModal({ onClose }: { onClose: () => void }) {
                 </select>
                 <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.5 }} />
               </div>
-              <span className="form-hint" style={{ marginTop: 4, fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+              <span style={{ marginTop: 4, fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'block' }}>
                 {role === 'admin' && 'Full access to all facilities and settings'}
                 {role === 'plant_manager' && 'Manage automation, energy, and controls for assigned facilities'}
                 {role === 'technician' && 'Control compressors and adjust setpoints at assigned facilities'}
@@ -157,8 +130,8 @@ function InviteModal({ onClose }: { onClose: () => void }) {
           </div>
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={invite.isPending}>
-              {invite.isPending ? 'Inviting...' : 'Send Invite'}
+            <button type="submit" className="btn-primary" disabled={sendInvite.isPending}>
+              {sendInvite.isPending ? 'Sending…' : 'Send Invite'}
             </button>
           </div>
         </form>
@@ -391,6 +364,51 @@ function MemberRow({
   )
 }
 
+// ── Pending Invites Section ─────────────────────
+function PendingInvitesSection() {
+  const { data } = usePendingInvites()
+  const revoke = useRevokeInvite()
+  const invites = (data?.invites ?? []).filter(i => i.is_valid)
+
+  if (invites.length === 0) return null
+
+  return (
+    <div className="card" style={{ marginTop: 24 }}>
+      <h3 style={{ marginTop: 0, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Clock size={15} />
+        Pending Invites
+        <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>{invites.length}</span>
+      </h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {invites.map(inv => (
+          <div key={inv.id} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 12px', background: 'var(--bg-tertiary)', borderRadius: 8,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Mail size={14} style={{ opacity: 0.5 }} />
+              <div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>{inv.email}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                  {ROLE_LABELS[inv.role as UserRole] ?? inv.role} · expires {new Date(inv.expires_at).toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+            <button
+              className="icon-btn"
+              title="Revoke invite"
+              onClick={() => revoke.mutate(inv.id)}
+              disabled={revoke.isPending}
+            >
+              <Trash2 size={14} style={{ color: 'var(--danger)' }} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ───────────────────────────────────
 export default function UserManagementPage() {
   const { user: currentUser, hasPermission } = useAuth()
@@ -475,6 +493,8 @@ export default function UserManagementPage() {
           </table>
         </div>
       </div>
+
+      {canManage && <PendingInvitesSection />}
 
       {/* Role reference */}
       <div className="card" style={{ marginTop: 24 }}>

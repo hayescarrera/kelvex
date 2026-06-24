@@ -14,16 +14,40 @@ export function useOrgMembers() {
   })
 }
 
-export function useInviteMember() {
+export const inviteKeys = {
+  all: ['invites'] as const,
+  list: () => [...inviteKeys.all, 'list'] as const,
+}
+
+export function useSendInvite() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { email: string; full_name: string; role?: string; password: string; facility_ids?: string[] }) =>
-      api.inviteMember(data),
+    mutationFn: (data: { email: string; role?: string; facility_ids?: string[] }) =>
+      api.sendInvite(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: memberKeys.list() })
-      toast.success('Member invited')
+      qc.invalidateQueries({ queryKey: inviteKeys.list() })
+      toast.success('Invite sent')
     },
-    onError: (e: Error) => toast.error(e.message || 'Failed to invite member'),
+    onError: (e: Error) => toast.error(e.message || 'Failed to send invite'),
+  })
+}
+
+export function usePendingInvites() {
+  return useQuery({
+    queryKey: inviteKeys.list(),
+    queryFn: () => api.listInvites(),
+  })
+}
+
+export function useRevokeInvite() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (inviteId: string) => api.revokeInvite(inviteId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: inviteKeys.list() })
+      toast.success('Invite revoked')
+    },
+    onError: (e: Error) => toast.error(e.message || 'Failed to revoke invite'),
   })
 }
 
