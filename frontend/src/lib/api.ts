@@ -696,6 +696,10 @@ class ApiClient {
     return this.request<{ message: string }>('/auth/password-reset/confirm', { method: 'POST', body: { token, password } })
   }
 
+  async changePassword(currentPassword: string, newPassword: string) {
+    return this.request<{ message: string }>('/auth/me/password', { method: 'POST', body: { current_password: currentPassword, new_password: newPassword } })
+  }
+
   async updateMember(userId: string, data: { role?: string; is_active?: boolean; full_name?: string; facility_ids?: string[] }) {
     return this.request<OrgMember>(`/auth/members/${userId}`, { method: 'PATCH', body: data })
   }

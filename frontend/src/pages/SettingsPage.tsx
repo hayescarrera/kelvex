@@ -594,32 +594,7 @@ export default function SettingsPage() {
           )}
 
           {activeSection === 'security' && (
-            <div className="card">
-              <div className="card-header"><h3>Security</h3></div>
-              <div className="card-body">
-                <div className="setting-row">
-                  <div>
-                    <div className="cell-primary">Two-factor authentication</div>
-                    <div className="text-muted">Add an extra layer of security</div>
-                  </div>
-                  <span className="badge badge-neutral">Not configured</span>
-                </div>
-                <div className="setting-row">
-                  <div>
-                    <div className="cell-primary">Active sessions</div>
-                    <div className="text-muted">Manage devices signed into your account</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>1 active</span>
-                </div>
-                <div className="setting-row" style={{ borderBottom: 'none' }}>
-                  <div>
-                    <div className="cell-primary">Sign out</div>
-                    <div className="text-muted">Sign out of your current session</div>
-                  </div>
-                  <button className="btn-secondary" onClick={logout}>Sign Out</button>
-                </div>
-              </div>
-            </div>
+            <SecuritySection onSignOut={logout} />
           )}
 
           {activeSection === 'data' && (
@@ -718,6 +693,91 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SecuritySection({ onSignOut }: { onSignOut: () => void }) {
+  const [currentPw, setCurrentPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [pwLoading, setPwLoading] = useState(false)
+  const [pwError, setPwError] = useState<string | null>(null)
+  const [pwDone, setPwDone] = useState(false)
+
+  const handleChangePw = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPwError(null)
+    if (newPw.length < 8) return setPwError('New password must be at least 8 characters.')
+    if (newPw !== confirmPw) return setPwError('Passwords do not match.')
+    setPwLoading(true)
+    try {
+      await api.changePassword(currentPw, newPw)
+      setPwDone(true)
+      setCurrentPw(''); setNewPw(''); setConfirmPw('')
+      toast.success('Password changed')
+    } catch (e: unknown) {
+      setPwError(e instanceof Error ? e.message : 'Failed to change password.')
+    } finally {
+      setPwLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="card">
+        <div className="card-header"><h3>Change Password</h3></div>
+        <div className="card-body" style={{ maxWidth: 420 }}>
+          {pwDone ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--success)', fontSize: 14 }}>
+              <Check size={16} /> Password updated successfully.
+            </div>
+          ) : (
+            <form onSubmit={handleChangePw} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="field">
+                <label>Current password</label>
+                <input type="password" value={currentPw} onChange={e => setCurrentPw(e.target.value)} required autoComplete="current-password" />
+              </div>
+              <div className="field">
+                <label>New password</label>
+                <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} required autoComplete="new-password" placeholder="At least 8 characters" />
+              </div>
+              <div className="field">
+                <label>Confirm new password</label>
+                <input
+                  type="password"
+                  value={confirmPw}
+                  onChange={e => setConfirmPw(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  style={{ borderColor: confirmPw && confirmPw !== newPw ? 'rgba(248,113,113,.4)' : undefined }}
+                />
+              </div>
+              {pwError && (
+                <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 6, padding: '8px 12px', fontSize: 13, color: '#f87171' }}>
+                  {pwError}
+                </div>
+              )}
+              <button type="submit" className="btn-primary" disabled={pwLoading} style={{ alignSelf: 'flex-start' }}>
+                {pwLoading ? <><Loader2 size={14} className="spin" /> Updating…</> : 'Update Password'}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header"><h3>Session</h3></div>
+        <div className="card-body">
+          <div className="setting-row" style={{ borderBottom: 'none' }}>
+            <div>
+              <div className="cell-primary">Sign out</div>
+              <div className="text-muted">Sign out of your current session</div>
+            </div>
+            <button className="btn-secondary" onClick={onSignOut}>Sign Out</button>
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from slugify import slugify
+from pydantic import BaseModel as _BaseModel, EmailStr as _EmailStr, field_validator
 import uuid
 import logging
 
@@ -200,6 +201,32 @@ async def update_me(
     await db.flush()
     await db.refresh(current_user)
     return current_user
+
+
+class ChangePasswordBody(_BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def strong_new_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+@router.post("/me/password", status_code=200)
+async def change_password(
+    body: ChangePasswordBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change the current user's password after verifying the existing one."""
+    if not verify_password(body.current_password, current_user.hashed_password):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect.")
+    current_user.hashed_password = get_password_hash(body.new_password)
+    await db.commit()
+    return {"message": "Password changed successfully."}
 
 
 # ── Member Management ──────────────────────────────
@@ -503,8 +530,6 @@ def _default_widgets() -> list[dict]:
 # ── Email invite tokens ───────────────────────────────────────────────────
 
 logger = logging.getLogger("kelvex.auth")
-
-from pydantic import BaseModel as _BaseModel, EmailStr as _EmailStr, field_validator
 
 class SendInviteRequest(_BaseModel):
     email: _EmailStr
