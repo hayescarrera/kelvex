@@ -667,6 +667,27 @@ class ApiClient {
     return this.request<OrgMember>('/auth/invite', { method: 'POST', body: data })
   }
 
+  // ── Email invite tokens ────────────────────────
+  async sendInvite(data: { email: string; role?: string; facility_ids?: string[] }) {
+    return this.request<{ id: string; token: string; email: string; role: string; expires_at: string }>('/auth/invites', { method: 'POST', body: data })
+  }
+
+  async listInvites() {
+    return this.request<{ invites: InviteRecord[]; total: number }>('/auth/invites')
+  }
+
+  async revokeInvite(inviteId: string) {
+    return this.request(`/auth/invites/${inviteId}`, { method: 'DELETE' })
+  }
+
+  async verifyInviteToken(token: string) {
+    return this.request<{ email: string; role: string; org_name: string; expires_at: string }>(`/auth/invites/verify?token=${token}`)
+  }
+
+  async acceptInvite(data: { token: string; full_name: string; password: string }) {
+    return this.request<{ access_token: string; refresh_token: string }>('/auth/invites/accept', { method: 'POST', body: data })
+  }
+
   async updateMember(userId: string, data: { role?: string; is_active?: boolean; full_name?: string; facility_ids?: string[] }) {
     return this.request<OrgMember>(`/auth/members/${userId}`, { method: 'PATCH', body: data })
   }
@@ -1832,6 +1853,18 @@ export interface OrgMember {
   is_active: boolean
   created_at: string
   facility_access: FacilityAccess[]
+}
+
+export interface InviteRecord {
+  id: string
+  token: string
+  email: string
+  role: string
+  facility_ids: string[] | null
+  expires_at: string
+  used_at: string | null
+  created_at: string
+  is_valid: boolean
 }
 
 // ── Compressor Types ──────────────────────────────

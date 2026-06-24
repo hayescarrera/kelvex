@@ -43,6 +43,7 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage'))
 const DocumentsPage = lazy(() => import('./pages/DocumentsPage'))
 const ControllerAccessPage = lazy(() => import('./pages/ControllerAccessPage'))
 const NotificationSettingsPage = lazy(() => import('./pages/NotificationSettingsPage'))
+const AcceptInvitePage = lazy(() => import('./pages/AcceptInvitePage'))
 const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
 const LeakTrackingPage = lazy(() => import('./pages/LeakTrackingPage'))
@@ -101,6 +102,7 @@ function AppRoutes() {
         path="/login"
         element={isAuthenticated ? <Navigate to="/" /> : <Login />}
       />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
       <Route element={<RequireAuth />}>
         {/* Role-aware home */}
         <Route index element={<RoleHome />} />

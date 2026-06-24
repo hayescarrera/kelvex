@@ -1,9 +1,11 @@
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from slugify import slugify
 import uuid
+import logging
 
 from app.core.database import get_db
 from app.services.audit_service import log_activity
@@ -496,3 +498,211 @@ def _default_widgets() -> list[dict]:
         {"id": "zones", "type": "zones", "title": "Zone Temperatures", "size": "sm"},
         {"id": "savings", "type": "savings", "title": "Savings Potential", "size": "sm"},
     ]
+
+
+# ── Email invite tokens ───────────────────────────────────────────────────
+
+logger = logging.getLogger("kelvex.auth")
+
+from pydantic import BaseModel as _BaseModel, EmailStr as _EmailStr
+
+class SendInviteRequest(_BaseModel):
+    email: _EmailStr
+    role: str = "operator"
+    facility_ids: list[uuid.UUID] | None = None
+
+class AcceptInviteRequest(_BaseModel):
+    token: uuid.UUID
+    full_name: str
+    password: str
+
+
+def _invite_to_dict(inv) -> dict:
+    from app.models.invite_token import InviteToken
+    return {
+        "id": str(inv.id),
+        "token": str(inv.token),
+        "email": inv.email,
+        "role": inv.role,
+        "facility_ids": inv.facility_ids,
+        "expires_at": inv.expires_at.isoformat(),
+        "used_at": inv.used_at.isoformat() if inv.used_at else None,
+        "created_at": inv.created_at.isoformat(),
+        "is_valid": inv.is_valid,
+    }
+
+
+@router.post("/invites", status_code=status.HTTP_201_CREATED)
+async def send_invite(
+    data: SendInviteRequest,
+    current_user: User = Depends(require_permission("users:invite")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a time-limited invite token and email it to the invitee."""
+    from app.models.invite_token import InviteToken
+
+    data.email = data.email.lower()
+
+    existing = await db.execute(select(User).where(User.email == data.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(400, detail="That email already has an account.")
+
+    # Invalidate any existing unused invite for this email in this org
+    old = await db.execute(
+        select(InviteToken).where(
+            InviteToken.org_id == current_user.org_id,
+            InviteToken.email == data.email,
+            InviteToken.used_at == None,
+        )
+    )
+    for old_inv in old.scalars().all():
+        old_inv.expires_at = datetime.now(timezone.utc)  # expire it immediately
+
+    facility_ids_json = [str(f) for f in data.facility_ids] if data.facility_ids else None
+    invite = InviteToken(
+        org_id=current_user.org_id,
+        invited_by=current_user.id,
+        email=data.email,
+        role=data.role,
+        facility_ids=facility_ids_json,
+    )
+    db.add(invite)
+    await db.commit()
+    await db.refresh(invite)
+
+    # Send invite email
+    invite_url = f"https://app.kelvex.io/accept-invite?token={invite.token}"
+    try:
+        from app.services.notification_service import send_notification
+        await send_notification(
+            db,
+            org_id=current_user.org_id,
+            subject=f"You've been invited to Kelvex",
+            body=f"""<p>Hi,</p>
+<p>{current_user.full_name or current_user.email} has invited you to join their Kelvex workspace as <strong>{data.role}</strong>.</p>
+<p><a href="{invite_url}" style="display:inline-block;background:#3BC9DB;color:#0E1116;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600">Accept invitation</a></p>
+<p style="color:#718096;font-size:13px">This link expires in 7 days. If you didn't expect this invitation, you can ignore this email.</p>""",
+        )
+    except Exception as e:
+        logger.warning("Could not send invite email to %s: %s", data.email, e)
+
+    return _invite_to_dict(invite)
+
+
+@router.get("/invites")
+async def list_invites(
+    current_user: User = Depends(require_permission("users:invite")),
+    db: AsyncSession = Depends(get_db),
+):
+    """List pending (unused, unexpired) invites for this org."""
+    from app.models.invite_token import InviteToken
+    result = await db.execute(
+        select(InviteToken).where(
+            InviteToken.org_id == current_user.org_id,
+        ).order_by(InviteToken.created_at.desc()).limit(100)
+    )
+    invites = result.scalars().all()
+    return {"invites": [_invite_to_dict(i) for i in invites], "total": len(invites)}
+
+
+@router.delete("/invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_invite(
+    invite_id: uuid.UUID,
+    current_user: User = Depends(require_permission("users:invite")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke a pending invite."""
+    from app.models.invite_token import InviteToken
+    result = await db.execute(
+        select(InviteToken).where(
+            InviteToken.id == invite_id,
+            InviteToken.org_id == current_user.org_id,
+        )
+    )
+    invite = result.scalar_one_or_none()
+    if not invite:
+        raise HTTPException(404, detail="Invite not found")
+    invite.expires_at = datetime.now(timezone.utc)
+    await db.commit()
+
+
+@router.get("/invites/verify")
+async def verify_invite(
+    token: uuid.UUID = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Public — validate an invite token. Returns email and org name for the accept-invite page."""
+    from app.models.invite_token import InviteToken
+    result = await db.execute(select(InviteToken).where(InviteToken.token == token))
+    invite = result.scalar_one_or_none()
+
+    if not invite:
+        raise HTTPException(404, detail="Invite not found or already used.")
+    if invite.is_used:
+        raise HTTPException(410, detail="This invite has already been used.")
+    if invite.is_expired:
+        raise HTTPException(410, detail="This invite has expired. Ask your admin to send a new one.")
+
+    org_result = await db.execute(
+        select(Organization).where(Organization.id == invite.org_id)
+    )
+    org = org_result.scalar_one_or_none()
+
+    return {
+        "email": invite.email,
+        "role": invite.role,
+        "org_name": org.name if org else "your organization",
+        "expires_at": invite.expires_at.isoformat(),
+    }
+
+
+@router.post("/invites/accept", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def accept_invite(
+    data: AcceptInviteRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Accept an invite: validate token, create user, return auth tokens."""
+    from app.models.invite_token import InviteToken
+
+    result = await db.execute(select(InviteToken).where(InviteToken.token == data.token))
+    invite = result.scalar_one_or_none()
+
+    if not invite:
+        raise HTTPException(404, detail="Invite not found.")
+    if invite.is_used:
+        raise HTTPException(410, detail="This invite has already been used.")
+    if invite.is_expired:
+        raise HTTPException(410, detail="This invite link has expired. Ask your admin to send a new one.")
+
+    if len(data.password) < 8:
+        raise HTTPException(422, detail="Password must be at least 8 characters.")
+
+    existing = await db.execute(select(User).where(User.email == invite.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(400, detail="An account with this email already exists.")
+
+    new_user = User(
+        email=invite.email,
+        hashed_password=get_password_hash(data.password),
+        full_name=data.full_name,
+        org_id=invite.org_id,
+        role=invite.role,
+        is_admin=(invite.role in {ROLE_OWNER, ROLE_ADMIN}),
+        is_active=True,
+    )
+    db.add(new_user)
+    await db.flush()
+
+    if invite.facility_ids and invite.role not in GLOBAL_ACCESS_ROLES:
+        for fid_str in invite.facility_ids:
+            db.add(UserFacilityAccess(user_id=new_user.id, facility_id=uuid.UUID(fid_str)))
+        await db.flush()
+
+    invite.used_at = datetime.now(timezone.utc)
+    invite.used_by = new_user.id
+
+    await db.commit()
+
+    access_token = create_access_token(data={"sub": str(new_user.id), "org": str(new_user.org_id)})
+    refresh_token = create_refresh_token(data={"sub": str(new_user.id), "org": str(new_user.org_id)})
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
