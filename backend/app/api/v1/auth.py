@@ -571,7 +571,7 @@ async def send_invite(
     await db.refresh(invite)
 
     # Send invite email directly to the invitee
-    invite_url = f"https://app.kelvex.io/accept-invite?token={invite.token}"
+    invite_url = f"{settings.FRONTEND_URL}/accept-invite?token={invite.token}"
     try:
         from app.services.notification_service import send_transactional_email
         from app.models.user import Organization

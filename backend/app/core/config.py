@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 50
     UPLOAD_DIR: str = "/data/documents"
 
+    # Frontend URL (used in transactional email links)
+    FRONTEND_URL: str = "https://app.kelvex.io"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

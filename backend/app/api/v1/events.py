@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_db, async_session
+from app.core.security import require_permission
 from app.models.user import User
 
 logger = logging.getLogger("coldgrid.events")
@@ -134,12 +135,9 @@ async def event_stream(token: str = Query(..., description="JWT access token")):
 
 @router.get("/subscribers")
 async def subscriber_count(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(lambda: None),  # placeholder
+    current_user: User = Depends(require_permission("admin:read")),
 ):
-    """Debug endpoint: show connected subscriber count per org."""
-    from app.core.security import get_current_user
-    # Just return global stats
+    """Admin debug endpoint: show connected SSE subscriber counts."""
     return {
         "total_orgs": len(_subscribers),
         "total_connections": sum(len(qs) for qs in _subscribers.values()),
