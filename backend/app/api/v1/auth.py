@@ -174,9 +174,18 @@ async def refresh_token(data: TokenRefresh, db: AsyncSession = Depends(get_db)):
 # ── Current user endpoints ────────────────────────
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """Get current user profile."""
-    return current_user
+    from app.models.user import Organization
+    org_result = await db.execute(select(Organization).where(Organization.id == current_user.org_id))
+    org = org_result.scalar_one_or_none()
+    # Build response dict with org_name appended
+    resp = UserResponse.model_validate(current_user)
+    resp.org_name = org.name if org else None
+    return resp
 
 
 @router.get("/me/permissions")
@@ -198,7 +207,7 @@ async def update_me(
     """Update current user profile."""
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(current_user, field, value)
-    await db.flush()
+    await db.commit()
     await db.refresh(current_user)
     return current_user
 
@@ -512,6 +521,7 @@ async def save_dashboard_layout(
         metadata_extra={"layout": layout},
     )
     db.add(entry)
+    await db.commit()
     return layout
 
 

@@ -143,6 +143,11 @@ export default function Sidebar({ onNavClick, mobileOpen }: SidebarProps = {}) {
           <KelvexLogo size={20} />
           <span className="logo-text">Kelvex</span>
         </div>
+        {user?.org_name && (
+          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', paddingLeft: 2, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {user.org_name}
+          </div>
+        )}
       </div>
 
       <SiteSelector />

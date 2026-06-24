@@ -74,6 +74,7 @@ class UserResponse(BaseModel):
     is_admin: bool
     role: str
     org_id: UUID
+    org_name: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

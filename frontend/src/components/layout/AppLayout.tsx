@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Menu, X, AlertTriangle } from 'lucide-react'
 import Sidebar from './Sidebar'
 import KelvexLogo from '../ui/KelvexLogo'
 import { useAlertSummary } from '../../hooks/useAlerts'
+import { useEventStream } from '../../hooks/useEventStream'
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/') return 'Dashboard'
@@ -103,8 +105,27 @@ function CriticalAlertBanner() {
   )
 }
 
+function useAppEventStream() {
+  const qc = useQueryClient()
+  useEventStream({
+    'alert:fired': () => {
+      qc.invalidateQueries({ queryKey: ['alerts'] })
+    },
+    'alert:resolved': () => {
+      qc.invalidateQueries({ queryKey: ['alerts'] })
+    },
+    'alert:acknowledged': () => {
+      qc.invalidateQueries({ queryKey: ['alerts'] })
+    },
+    'activity:new': () => {
+      qc.invalidateQueries({ queryKey: ['activity'] })
+    },
+  })
+}
+
 export default function AppLayout({ children }: { children: ReactNode }) {
   useDocumentTitle()
+  useAppEventStream()
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
 
