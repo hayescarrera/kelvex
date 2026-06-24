@@ -205,6 +205,67 @@ async def alert_summary(
     }
 
 
+# ── Org-wide alert list ────────────────────────────
+
+@router.get("/alerts")
+async def list_all_alerts(
+    state: str | None = Query(None),
+    severity: str | None = Query(None),
+    facility_id: UUID | None = Query(None),
+    limit: int = Query(100, le=500),
+    offset: int = Query(0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List alerts across all org facilities, optionally filtered."""
+    query = (
+        select(Alert, Facility.name.label("facility_name"))
+        .join(Facility, Alert.facility_id == Facility.id)
+        .where(Facility.org_id == current_user.org_id)
+    )
+    count_query = (
+        select(func.count(Alert.id))
+        .join(Facility, Alert.facility_id == Facility.id)
+        .where(Facility.org_id == current_user.org_id)
+    )
+
+    if state:
+        query = query.where(Alert.state == state)
+        count_query = count_query.where(Alert.state == state)
+    if severity:
+        query = query.where(Alert.severity == severity)
+        count_query = count_query.where(Alert.severity == severity)
+    if facility_id:
+        query = query.where(Alert.facility_id == facility_id)
+        count_query = count_query.where(Alert.facility_id == facility_id)
+
+    total = (await db.execute(count_query)).scalar()
+    result = await db.execute(
+        query.order_by(Alert.triggered_at.desc()).offset(offset).limit(limit)
+    )
+    rows = result.all()
+    alerts = []
+    for row in rows:
+        alert = row[0]
+        d = {
+            "id": str(alert.id),
+            "facility_id": str(alert.facility_id),
+            "facility_name": row[1],
+            "title": alert.title,
+            "category": alert.category,
+            "severity": alert.severity,
+            "state": alert.state,
+            "triggered_at": alert.triggered_at.isoformat() if alert.triggered_at else None,
+            "acknowledged_at": alert.acknowledged_at.isoformat() if alert.acknowledged_at else None,
+            "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at else None,
+            "message": getattr(alert, "message", None),
+            "measured_value": getattr(alert, "measured_value", None),
+            "threshold_value": getattr(alert, "threshold_value", None),
+        }
+        alerts.append(d)
+    return {"alerts": alerts, "total": total}
+
+
 # ── Events (audit log) ────────────────────────────
 
 @router.get("/facilities/{facility_id}/events", response_model=EventListResponse)

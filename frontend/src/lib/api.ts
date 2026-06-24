@@ -285,6 +285,18 @@ class ApiClient {
     )
   }
 
+  async listAllAlerts(params?: { state?: string; severity?: string; facility_id?: string; limit?: number }) {
+    const query = new URLSearchParams()
+    if (params?.state) query.set('state', params.state)
+    if (params?.severity) query.set('severity', params.severity)
+    if (params?.facility_id) query.set('facility_id', params.facility_id)
+    if (params?.limit) query.set('limit', String(params.limit))
+    const qs = query.toString()
+    return this.request<{ alerts: (Alert & { facility_name: string })[]; total: number }>(
+      `/alerts${qs ? '?' + qs : ''}`
+    )
+  }
+
   async updateAlert(facilityId: string, alertId: string, data: { state?: string; resolution_note?: string }) {
     return this.request<Alert>(`/facilities/${facilityId}/alerts/${alertId}`, { method: 'PATCH', body: data })
   }

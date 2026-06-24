@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 export const alertKeys = {
   all: ['alerts'] as const,
   list: (facilityId: string) => [...alertKeys.all, 'list', facilityId] as const,
+  orgList: (params?: object) => [...alertKeys.all, 'org-list', params] as const,
   summary: () => [...alertKeys.all, 'summary'] as const,
 }
 
@@ -13,6 +14,14 @@ export function useAlerts(facilityId: string | undefined, params?: { state?: str
     queryKey: [...alertKeys.list(facilityId ?? ''), params],
     queryFn: () => api.listAlerts(facilityId!, params),
     enabled: !!facilityId,
+    refetchInterval: 30_000,
+  })
+}
+
+export function useAllAlerts(params?: { state?: string; severity?: string }) {
+  return useQuery({
+    queryKey: alertKeys.orgList(params),
+    queryFn: () => api.listAllAlerts(params),
     refetchInterval: 30_000,
   })
 }

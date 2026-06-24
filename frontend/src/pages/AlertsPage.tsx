@@ -7,7 +7,7 @@ import StatCard from '../components/ui/StatCard'
 import LoadingState from '../components/ui/LoadingState'
 import EmptyState from '../components/ui/EmptyState'
 import { useSiteContext } from '../contexts/SiteContext'
-import { useAlerts, useAlertSummary, useUpdateAlert } from '../hooks/useAlerts'
+import { useAlerts, useAllAlerts, useAlertSummary, useUpdateAlert } from '../hooks/useAlerts'
 import { api } from '../lib/api'
 import type { Alert } from '../lib/api'
 
@@ -36,12 +36,16 @@ const stateBadge = (state: string) => {
 }
 
 export default function AlertsPage() {
-  const { site, facilities } = useSiteContext()
+  const { site } = useSiteContext()
   const [severityFilter, setSeverityFilter] = useState<string>('')
   const [stateFilter, setStateFilter] = useState<string>('')
 
   const facilityId = site?.id
   const { data, isLoading } = useAlerts(facilityId, {
+    severity: severityFilter || undefined,
+    state: stateFilter || undefined,
+  })
+  const { data: orgData, isLoading: orgLoading } = useAllAlerts({
     severity: severityFilter || undefined,
     state: stateFilter || undefined,
   })
@@ -88,40 +92,72 @@ export default function AlertsPage() {
   }
 
   if (!site) {
+    const orgAlerts = orgData?.alerts ?? []
     return (
       <div className="page-container">
-        <PageHeader title="Alerts & Events" subtitle="Monitor facility health across your fleet" />
+        <PageHeader title="Alerts & Events" subtitle={`Fleet-wide — ${orgData?.total ?? 0} alert${(orgData?.total ?? 0) !== 1 ? 's' : ''}`}>
+          <Link to="/settings" className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, textDecoration: 'none' }}>
+            <Bell size={14} /> Configure Notifications
+          </Link>
+        </PageHeader>
+        <div className="stat-grid stagger" style={{ marginTop: 20 }}>
+          <StatCard icon={<AlertTriangle size={18} />} color="var(--danger)" value={String(summary?.total_active ?? 0)} label="Active Alerts" />
+          <StatCard icon={<Shield size={18} />} color="var(--warning)" value={String(summary?.by_severity?.critical ?? 0)} label="Critical" />
+          <StatCard icon={<Bell size={18} />} color="var(--info)" value={String(summary?.by_severity?.high ?? 0)} label="High" />
+          <StatCard icon={<CheckCircle size={18} />} color="var(--success)" value={String((summary?.by_severity?.medium ?? 0) + (summary?.by_severity?.low ?? 0))} label="Medium/Low" />
+        </div>
         <div className="content-area">
-          <div className="stat-grid stagger">
-            <StatCard icon={<AlertTriangle size={18} />} color="var(--danger)" value={String(summary?.total_active ?? 0)} label="Active Alerts" />
-            <StatCard icon={<Shield size={18} />} color="var(--warning)" value={String(summary?.by_severity?.critical ?? 0)} label="Critical" />
-            <StatCard icon={<Bell size={18} />} color="var(--info)" value={String(summary?.by_severity?.high ?? 0)} label="High" />
-            <StatCard icon={<CheckCircle size={18} />} color="var(--success)" value={String((summary?.by_severity?.medium ?? 0) + (summary?.by_severity?.low ?? 0))} label="Medium/Low" />
-          </div>
-          <div className="card" style={{ marginTop: 20 }}>
+          <div className="card">
             <div className="card-header">
-              <h3>Showing fleet-wide counts</h3>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                Use the site selector in the sidebar to filter alerts by facility
-              </span>
+              <h3>All Alerts</h3>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Filter size={14} style={{ color: 'var(--text-muted)', alignSelf: 'center' }} />
+                <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value)}
+                  style={{ padding: '5px 10px', fontSize: 12, border: '1px solid var(--input-border)', borderRadius: 'var(--radius-sm)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontFamily: 'inherit' }}>
+                  <option value="">All severities</option>
+                  {SEVERITY_ORDER.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                </select>
+                <select value={stateFilter} onChange={e => setStateFilter(e.target.value)}
+                  style={{ padding: '5px 10px', fontSize: 12, border: '1px solid var(--input-border)', borderRadius: 'var(--radius-sm)', background: 'var(--input-bg)', color: 'var(--text-primary)', fontFamily: 'inherit' }}>
+                  <option value="">All states</option>
+                  <option value="active">Active</option>
+                  <option value="acknowledged">Acknowledged</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+              </div>
             </div>
-            <div className="card-body" style={{ padding: 0 }}>
-              <table className="data-table">
-                <thead>
-                  <tr><th>Facility</th><th>Location</th></tr>
-                </thead>
-                <tbody>
-                  {facilities.map(f => (
-                    <tr key={f.id}>
-                      <td><span className="cell-primary">{f.name}</span></td>
-                      <td style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                        {[f.city, f.state].filter(Boolean).join(', ') || '—'}
-                      </td>
+            {orgLoading ? <LoadingState /> : orgAlerts.length === 0 ? (
+              <EmptyState icon={<CheckCircle size={24} />} title="No alerts" description="All systems are running normally across your fleet." />
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Severity</th>
+                      <th>Alert</th>
+                      <th>Facility</th>
+                      <th>State</th>
+                      <th>Time</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {orgAlerts.map(alert => (
+                      <tr key={alert.id}>
+                        <td><span className={`badge ${severityBadge(alert.severity)}`}>{alert.severity}</span></td>
+                        <td>
+                          <span className="cell-primary">{alert.title}</span>
+                          {alert.category && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{formatCategory(alert.category)}</div>}
+                        </td>
+                        <td style={{ fontSize: 13 }}>{(alert as Alert & { facility_name: string }).facility_name}</td>
+                        <td><span className={`badge ${stateBadge(alert.state)}`}>{alert.state}</span></td>
+                        <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatTime(alert.triggered_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </div>
