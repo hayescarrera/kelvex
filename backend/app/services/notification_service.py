@@ -30,6 +30,37 @@ from app.models.notification import NotificationChannel, NotificationLog
 logger = logging.getLogger("coldgrid.notifications")
 
 
+async def send_transactional_email(
+    to_email: str,
+    subject: str,
+    html_body: str,
+    text_body: str = "",
+) -> None:
+    """Send a one-off transactional email (password reset, invite, etc.) directly via SMTP."""
+    import asyncio
+
+    settings = get_settings()
+    host = settings.SMTP_HOST
+    port = settings.SMTP_PORT
+    user = settings.SMTP_USER
+    password = settings.SMTP_PASSWORD
+    from_addr = settings.SMTP_FROM
+
+    if not host:
+        raise ValueError("SMTP not configured — set SMTP_HOST in environment")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = to_email
+    if text_body:
+        msg.attach(MIMEText(text_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    await asyncio.to_thread(_smtp_send, host, port, user, password, from_addr, [to_email], msg)
+    logger.info("Transactional email sent to %s: %s", to_email, subject)
+
+
 async def send_notification(
     db: AsyncSession,
     org_id: UUID,

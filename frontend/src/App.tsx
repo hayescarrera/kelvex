@@ -44,6 +44,8 @@ const DocumentsPage = lazy(() => import('./pages/DocumentsPage'))
 const ControllerAccessPage = lazy(() => import('./pages/ControllerAccessPage'))
 const NotificationSettingsPage = lazy(() => import('./pages/NotificationSettingsPage'))
 const AcceptInvitePage = lazy(() => import('./pages/AcceptInvitePage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 const ActivityLogPage = lazy(() => import('./pages/ActivityLogPage'))
 const OnboardingPage = lazy(() => import('./pages/OnboardingPage'))
 const LeakTrackingPage = lazy(() => import('./pages/LeakTrackingPage'))
@@ -103,6 +105,8 @@ function AppRoutes() {
         element={isAuthenticated ? <Navigate to="/" /> : <Login />}
       />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
+      <Route path="/forgot-password" element={<Suspense fallback={null}><ForgotPasswordPage /></Suspense>} />
+      <Route path="/reset-password" element={<Suspense fallback={null}><ResetPasswordPage /></Suspense>} />
       <Route element={<RequireAuth />}>
         {/* Role-aware home */}
         <Route index element={<RoleHome />} />

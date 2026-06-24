@@ -237,15 +237,20 @@ export default function Login() {
             )}
 
             {!isRegister && (
-              <label style={styles.rememberRow}>
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={e => setRememberMe(e.target.checked)}
-                  style={{ accentColor: '#38bdf8', width: 14, height: 14 }}
-                />
-                <span style={{ fontSize: 13, color: '#94a3b8' }}>Remember me</span>
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label style={{ ...styles.rememberRow, margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={e => setRememberMe(e.target.checked)}
+                    style={{ accentColor: '#38bdf8', width: 14, height: 14 }}
+                  />
+                  <span style={{ fontSize: 13, color: '#94a3b8' }}>Remember me</span>
+                </label>
+                <a href="/forgot-password" style={{ fontSize: 13, color: '#38bdf8', textDecoration: 'none' }}>
+                  Forgot password?
+                </a>
+              </div>
             )}
 
             <button type="submit" style={styles.submitBtn} disabled={loading}>

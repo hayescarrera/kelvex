@@ -504,7 +504,7 @@ def _default_widgets() -> list[dict]:
 
 logger = logging.getLogger("kelvex.auth")
 
-from pydantic import BaseModel as _BaseModel, EmailStr as _EmailStr
+from pydantic import BaseModel as _BaseModel, EmailStr as _EmailStr, field_validator
 
 class SendInviteRequest(_BaseModel):
     email: _EmailStr
@@ -570,18 +570,27 @@ async def send_invite(
     await db.commit()
     await db.refresh(invite)
 
-    # Send invite email
+    # Send invite email directly to the invitee
     invite_url = f"https://app.kelvex.io/accept-invite?token={invite.token}"
     try:
-        from app.services.notification_service import send_notification
-        await send_notification(
-            db,
-            org_id=current_user.org_id,
-            subject=f"You've been invited to Kelvex",
-            body=f"""<p>Hi,</p>
-<p>{current_user.full_name or current_user.email} has invited you to join their Kelvex workspace as <strong>{data.role}</strong>.</p>
-<p><a href="{invite_url}" style="display:inline-block;background:#3BC9DB;color:#0E1116;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600">Accept invitation</a></p>
-<p style="color:#718096;font-size:13px">This link expires in 7 days. If you didn't expect this invitation, you can ignore this email.</p>""",
+        from app.services.notification_service import send_transactional_email
+        from app.models.user import Organization
+        org_result = await db.execute(select(Organization).where(Organization.id == current_user.org_id))
+        org = org_result.scalar_one_or_none()
+        org_name = org.name if org else "your team"
+        sender_name = current_user.full_name or current_user.email
+        await send_transactional_email(
+            to_email=data.email,
+            subject=f"You've been invited to join {org_name} on Kelvex",
+            html_body=(
+                f"<p>Hi,</p>"
+                f"<p>{sender_name} has invited you to join <strong>{org_name}</strong> on Kelvex as <strong>{data.role}</strong>.</p>"
+                f"<p style='margin:24px 0'>"
+                f"<a href='{invite_url}' style='background:#3BC9DB;color:#0E1116;padding:10px 24px;"
+                f"border-radius:6px;text-decoration:none;font-weight:600'>Accept invitation</a></p>"
+                f"<p style='color:#718096;font-size:13px'>This link expires in 7 days. If you didn't expect this invitation, you can ignore this email.</p>"
+            ),
+            text_body=f"You've been invited to join {org_name} on Kelvex.\n\nAccept your invitation: {invite_url}\n\nThis link expires in 7 days.",
         )
     except Exception as e:
         logger.warning("Could not send invite email to %s: %s", data.email, e)
@@ -706,3 +715,96 @@ async def accept_invite(
     access_token = create_access_token(data={"sub": str(new_user.id), "org": str(new_user.org_id)})
     refresh_token = create_refresh_token(data={"sub": str(new_user.id), "org": str(new_user.org_id)})
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+
+
+# ── Password Reset ────────────────────────────────
+
+_RESET_TTL = 3600  # 1 hour
+
+
+class PasswordResetRequestBody(_BaseModel):
+    email: str
+
+
+class PasswordResetConfirmBody(_BaseModel):
+    token: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def strong_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+@router.post("/password-reset/request", status_code=200)
+async def request_password_reset(
+    body: PasswordResetRequestBody,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a password reset link. Always returns 200 to prevent email enumeration."""
+    from app.services.cache import get_redis
+    from app.services.notification_service import send_notification, NotificationPayload
+
+    email = body.email.lower().strip()
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        return {"message": "If that email exists you will receive a reset link."}
+
+    reset_token = str(uuid.uuid4())
+    redis = await get_redis()
+    if redis:
+        await redis.setex(f"pwreset:{reset_token}", _RESET_TTL, str(user.id))
+
+    frontend_url = getattr(settings, "FRONTEND_URL", "https://app.kelvex.io")
+    reset_link = f"{frontend_url}/reset-password?token={reset_token}"
+
+    try:
+        from app.services.notification_service import send_transactional_email
+        await send_transactional_email(
+            to_email=email,
+            subject="Reset your Kelvex password",
+            html_body=(
+                f"<p>Hi {user.full_name},</p>"
+                f"<p>Click the link below to reset your password. This link expires in 1 hour.</p>"
+                f"<p style='margin:24px 0'>"
+                f"<a href='{reset_link}' style='background:#3BC9DB;color:#0E1116;padding:10px 24px;"
+                f"border-radius:6px;text-decoration:none;font-weight:600'>Reset password</a></p>"
+                f"<p style='color:#718096;font-size:13px'>If you didn't request this, you can ignore this email.</p>"
+            ),
+            text_body=f"Reset your Kelvex password: {reset_link}\n\nThis link expires in 1 hour.",
+        )
+    except Exception as e:
+        logger.warning("Could not send password reset email to %s: %s", email, e)
+
+    return {"message": "If that email exists you will receive a reset link."}
+
+
+@router.post("/password-reset/confirm", status_code=200)
+async def confirm_password_reset(
+    body: PasswordResetConfirmBody,
+    db: AsyncSession = Depends(get_db),
+):
+    """Validate reset token and update password."""
+    from app.services.cache import get_redis
+
+    redis = await get_redis()
+    if not redis:
+        raise HTTPException(503, detail="Password reset service is temporarily unavailable.")
+
+    user_id = await redis.get(f"pwreset:{body.token}")
+    if not user_id:
+        raise HTTPException(400, detail="This reset link is invalid or has expired.")
+
+    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(400, detail="This reset link is invalid or has expired.")
+
+    user.hashed_password = get_password_hash(body.password)
+    await redis.delete(f"pwreset:{body.token}")
+    await db.commit()
+
+    return {"message": "Password updated. You can now sign in."}

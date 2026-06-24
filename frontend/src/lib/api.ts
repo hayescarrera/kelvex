@@ -688,6 +688,14 @@ class ApiClient {
     return this.request<{ access_token: string; refresh_token: string }>('/auth/invites/accept', { method: 'POST', body: data })
   }
 
+  async requestPasswordReset(email: string) {
+    return this.request<{ message: string }>('/auth/password-reset/request', { method: 'POST', body: { email } })
+  }
+
+  async confirmPasswordReset(token: string, password: string) {
+    return this.request<{ message: string }>('/auth/password-reset/confirm', { method: 'POST', body: { token, password } })
+  }
+
   async updateMember(userId: string, data: { role?: string; is_active?: boolean; full_name?: string; facility_ids?: string[] }) {
     return this.request<OrgMember>(`/auth/members/${userId}`, { method: 'PATCH', body: data })
   }
