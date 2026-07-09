@@ -577,8 +577,16 @@ body {
   animation: fadeIn 0.12s ease;
 }
 
+.site-selector-chevron {
+  opacity: 0.45;
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+
 .site-selector-dropdown button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   padding: 7px 10px;
   background: none;
@@ -595,10 +603,45 @@ body {
   background: var(--bg-hover);
 }
 
+.site-selector-dropdown button.active {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
 .site-option-divider {
   height: 1px;
   background: var(--border-subtle);
   margin: 3px 0;
+}
+
+.site-search-wrap {
+  position: relative;
+  padding: 4px 4px 2px;
+}
+
+.site-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.site-search-input {
+  width: 100%;
+  padding: 6px 8px 6px 28px;
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.site-search-input:focus {
+  border-color: var(--accent);
 }
 
 /* ═══════════════════════════════════════════════════════════

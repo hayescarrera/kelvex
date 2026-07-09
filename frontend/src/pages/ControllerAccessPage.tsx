@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Monitor, Lock, Plus, X, ShieldAlert, Clock, CheckCircle,
+  Monitor, Lock, Plus, X, ShieldAlert, Clock, CheckCircle, ExternalLink,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import PageHeader from '../components/ui/PageHeader'
@@ -8,7 +8,8 @@ import LoadingState from '../components/ui/LoadingState'
 import { api } from '../lib/api'
 import { useSiteContext } from '../contexts/SiteContext'
 import { useAuth } from '../contexts/AuthContext'
-import type { TunnelSession, Facility } from '../lib/api'
+import { useAgents } from '../hooks/useAgents'
+import type { TunnelSession, Facility, EdgeAgent } from '../lib/api'
 
 function formatDt(iso: string) {
   return new Date(iso).toLocaleString('en-US', {
@@ -37,9 +38,14 @@ function StartSessionModal({ facilities, defaultFacilityId, onClose, onSuccess }
   const [starting, setStarting] = useState(false)
   const [form, setForm] = useState({
     facility_id: defaultFacilityId ?? (facilities[0]?.id ?? ''),
+    agent_id: '',
     target_device: '',
     notes: '',
   })
+
+  const { data: agentsData } = useAgents(form.facility_id || undefined)
+  const agents: EdgeAgent[] = agentsData?.agents ?? []
+  const selectedAgent = agents.find(a => a.id === form.agent_id) ?? null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -48,10 +54,11 @@ function StartSessionModal({ facilities, defaultFacilityId, onClose, onSuccess }
     try {
       await api.startTunnelSession({
         facility_id: form.facility_id,
+        agent_id: form.agent_id || undefined,
         target_device: form.target_device || undefined,
         notes: form.notes || undefined,
       })
-      toast.success('Tunnel session started — connection details will appear in the agent')
+      toast.success('Session started')
       onSuccess()
       onClose()
     } catch (err) {
@@ -80,11 +87,37 @@ function StartSessionModal({ facilities, defaultFacilityId, onClose, onSuccess }
           </div>
           <div className="field">
             <label>Site *</label>
-            <select value={form.facility_id} onChange={e => setForm({ ...form, facility_id: e.target.value })} required>
+            <select value={form.facility_id} onChange={e => setForm({ ...form, facility_id: e.target.value, agent_id: '' })} required>
               <option value="">Select a site...</option>
               {facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </div>
+          {agents.length > 0 && (
+            <div className="field">
+              <label>Edge Agent</label>
+              <select value={form.agent_id} onChange={e => setForm({ ...form, agent_id: e.target.value })}>
+                <option value="">Select agent...</option>
+                {agents.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}{a.connection_state === 'connected' ? ' ●' : ' ○'}
+                    {a.controller_url ? ` — ${a.controller_url}` : ''}
+                  </option>
+                ))}
+              </select>
+              {selectedAgent?.controller_url && (
+                <div style={{
+                  marginTop: 6, padding: '6px 10px', borderRadius: 6, fontSize: 12,
+                  background: 'color-mix(in srgb, var(--success) 10%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <Monitor size={12} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                  <span style={{ color: 'var(--text-secondary)' }}>Will connect to: </span>
+                  <code style={{ fontSize: 11 }}>{selectedAgent.controller_url}</code>
+                </div>
+              )}
+            </div>
+          )}
           <div className="field">
             <label>Target Device <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
             <input value={form.target_device} onChange={e => setForm({ ...form, target_device: e.target.value })}
@@ -216,6 +249,7 @@ export default function ControllerAccessPage() {
                   <th>Target</th>
                   <th>Started</th>
                   <th>Duration</th>
+                  <th>Controller</th>
                   <th></th>
                 </tr>
               </thead>
@@ -237,6 +271,15 @@ export default function ControllerAccessPage() {
                         <span style={{ color: 'var(--warning)', fontWeight: 600 }}>
                           {sessionDuration(s.started_at, null)}
                         </span>
+                      </td>
+                      <td>
+                        {s.controller_url ? (
+                          <a href={s.controller_url} target="_blank" rel="noopener noreferrer"
+                            className="btn-secondary"
+                            style={{ fontSize: 11, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <ExternalLink size={12} /> Open UI
+                          </a>
+                        ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
                       </td>
                       <td>
                         <button className="btn-secondary" onClick={() => handleEndSession(s.id)}

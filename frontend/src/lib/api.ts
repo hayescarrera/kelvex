@@ -240,6 +240,7 @@ class ApiClient {
     name: string; equipment_type: string;
     manufacturer?: string; model?: string;
     controller_type?: string; protocol?: string;
+    portal_url?: string;
   }) {
     return this.request<Equipment>(`/facilities/${facilityId}/equipment`, {
       method: 'POST', body: data,
@@ -265,6 +266,33 @@ class ApiClient {
 
   async deleteZone(facilityId: string, zoneId: string) {
     return this.request(`/facilities/${facilityId}/zones/${zoneId}`, { method: 'DELETE' })
+  }
+
+  async listZoneSensors(facilityId: string, zoneId: string) {
+    return this.request<{ sensors: ZoneSensor[]; total: number }>(
+      `/facilities/${facilityId}/zones/${zoneId}/sensors`
+    )
+  }
+
+  async createZoneSensor(facilityId: string, zoneId: string, data: ZoneSensorCreate) {
+    return this.request<ZoneSensor>(
+      `/facilities/${facilityId}/zones/${zoneId}/sensors`,
+      { method: 'POST', body: data }
+    )
+  }
+
+  async updateZoneSensor(facilityId: string, zoneId: string, sensorId: string, data: Partial<ZoneSensorCreate>) {
+    return this.request<ZoneSensor>(
+      `/facilities/${facilityId}/zones/${zoneId}/sensors/${sensorId}`,
+      { method: 'PATCH', body: data }
+    )
+  }
+
+  async deleteZoneSensor(facilityId: string, zoneId: string, sensorId: string) {
+    return this.request(
+      `/facilities/${facilityId}/zones/${zoneId}/sensors/${sensorId}`,
+      { method: 'DELETE' }
+    )
   }
 
   async assignEquipmentToZone(facilityId: string, zoneId: string, equipmentId: string, role?: string) {
@@ -475,6 +503,10 @@ class ApiClient {
     return this.request<AgentConfigBundle>(
       `/facilities/${facilityId}/agents/${agentId}/config`
     )
+  }
+
+  async createSetupToken(facilityId: string, agentId: string): Promise<{ install_command: string; expires_in: number }> {
+    return this.request(`/facilities/${facilityId}/agents/${agentId}/setup-token`, { method: 'POST' })
   }
 
   // ── Savings ───────────────────────────────
@@ -875,6 +907,24 @@ class ApiClient {
     return this.request<SavingsProjection>(`/facilities/${facilityId}/energy/savings-projection`)
   }
 
+  async getOpportunities(facilityId: string, params?: { status?: string; opp_type?: string; limit?: number }) {
+    const qs = new URLSearchParams()
+    if (params?.status)   qs.set('status', params.status)
+    if (params?.opp_type) qs.set('opp_type', params.opp_type)
+    if (params?.limit)    qs.set('limit', String(params.limit))
+    return this.request<OpportunitiesResponse>(`/facilities/${facilityId}/energy/opportunities${qs.toString() ? '?' + qs : ''}`)
+  }
+
+  async getOpportunitiesSummary(facilityId: string) {
+    return this.request<OpportunitySummary>(`/facilities/${facilityId}/energy/opportunities/summary`)
+  }
+
+  async patchOpportunity(facilityId: string, oppId: string, data: { status: string; work_order_id?: string }) {
+    return this.request<EnergyOpportunity>(`/facilities/${facilityId}/energy/opportunities/${oppId}`, {
+      method: 'PATCH', body: data,
+    })
+  }
+
   // ── Activity Log ─────────────────────────────
   async getActivityLog(params?: {
     resource_type?: string; action?: string; facility_id?: string;
@@ -1228,7 +1278,7 @@ class ApiClient {
     return this.request<{ sessions: TunnelSession[]; total: number }>(`/tunnel/sessions?${qs}`)
   }
 
-  async startTunnelSession(data: { facility_id: string; target_device?: string; notes?: string }) {
+  async startTunnelSession(data: { facility_id: string; agent_id?: string; target_device?: string; notes?: string }) {
     return this.request<TunnelSession>('/tunnel/sessions', { method: 'POST', body: data })
   }
 
@@ -1335,6 +1385,7 @@ export interface Equipment {
   model: string | null
   controller_type: string | null
   protocol: string | null
+  portal_url: string | null
   commissioned_at: string | null
   created_at: string
 }
@@ -1379,6 +1430,54 @@ export interface ZoneCreate {
   temp_alarm_low?: number
   humidity_setpoint?: number
   humidity_alarm_high?: number
+}
+
+export interface ZoneSensor {
+  id: string
+  zone_id: string
+  name: string
+  sensor_type: string
+  unit: string | null
+  location_desc: string | null
+  alarm_high: number | null
+  alarm_low: number | null
+  warn_high: number | null
+  warn_low: number | null
+  current_value: number | null
+  current_state: string
+  last_reading_at: string | null
+  poll_interval_sec: number
+  enabled: boolean
+  created_at: string
+  host: string | null
+  port: number
+  slave_id: number
+  register_address: number | null
+  register_type: string
+  data_type: string
+  scale: number
+  offset: number
+}
+
+export interface ZoneSensorCreate {
+  name: string
+  sensor_type: string
+  unit?: string
+  location_desc?: string
+  alarm_high?: number
+  alarm_low?: number
+  warn_high?: number
+  warn_low?: number
+  poll_interval_sec?: number
+  enabled?: boolean
+  host?: string
+  port?: number
+  slave_id?: number
+  register_address?: number
+  register_type?: string
+  data_type?: string
+  scale?: number
+  offset?: number
 }
 
 export interface Alert {
@@ -1521,6 +1620,7 @@ export interface EdgeAgent {
   config_version: number
   pending_commands: number
   registered_at: string
+  controller_url: string | null
 }
 
 export interface DeviceProfile {
@@ -1922,6 +2022,7 @@ export interface Compressor {
   health_score: number | null
   last_reading_at: string | null
   rack_name: string | null
+  portal_url: string | null
   created_at: string
   updated_at: string
 }
@@ -1963,6 +2064,7 @@ export interface CompressorHealthSummary {
   refrigerant: string
   hp: number | null
   rack_name: string | null
+  portal_url: string | null
   discharge_pressure_psi: number | null
   suction_pressure_psi: number | null
   oil_temp_f: number | null
@@ -2671,6 +2773,7 @@ export interface TunnelSession {
   end_reason: string | null
   ip_address: string | null
   notes: string | null
+  controller_url: string | null
 }
 
 export interface MaintenanceEventEntry {
@@ -2687,4 +2790,43 @@ export interface MaintenanceEventEntry {
   occurred_at: string
   created_by: string | null
   created_at: string
+}
+
+export interface EnergyOpportunity {
+  id: string
+  facility_id: string
+  system_id: string | null
+  opp_type: string
+  status: string
+  window_start: string | null
+  window_end: string | null
+  current_value: number | null
+  target_value: number | null
+  estimated_kwh_year: number | null
+  estimated_usd_year: number | null
+  confidence: number | null
+  recommended_action: string | null
+  evidence: Record<string, unknown> | null
+  work_order_id: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface OpportunitiesResponse {
+  facility_id: string
+  count: number
+  opportunities: EnergyOpportunity[]
+}
+
+export interface OpportunitySummary {
+  facility_id: string
+  status_filter: string
+  total_estimated_usd_year: number
+  total_estimated_kwh_year: number
+  by_type: {
+    opp_type: string
+    count: number
+    estimated_usd_year: number
+    estimated_kwh_year: number
+  }[]
 }

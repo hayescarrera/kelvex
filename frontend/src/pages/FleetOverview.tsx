@@ -30,7 +30,10 @@ interface PortfolioData {
 
 export default function FleetOverview() {
   const navigate = useNavigate()
-  const { facilities, isLoading } = useSiteContext()
+  const { facilities, isLoading, setSite } = useSiteContext()
+
+  // Landing on Portfolio always clears the active site
+  useEffect(() => { setSite(null) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const { data: alertSummary } = useAlertSummary()
   const [showAddModal, setShowAddModal] = useState(false)
   const deleteFacility = useDeleteFacility()

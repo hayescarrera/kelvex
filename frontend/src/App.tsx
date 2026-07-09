@@ -21,11 +21,9 @@ const FacilityDetail = lazy(() => import('./pages/FacilityDetail'))
 const FacilityOverview = lazy(() => import('./pages/facility/FacilityOverview'))
 const ZonesPage = lazy(() => import('./pages/facility/ZonesPage'))
 const EquipmentPage = lazy(() => import('./pages/facility/EquipmentPage'))
-const BillsPage = lazy(() => import('./pages/facility/BillsPage'))
 const DemandTab = lazy(() => import('./pages/facility/DemandTab'))
 const ControlsPage = lazy(() => import('./pages/facility/ControlsPage'))
-const AgentsPage = lazy(() => import('./pages/facility/AgentsPage'))
-const IntegrationsPage = lazy(() => import('./pages/facility/IntegrationsPage'))
+const ConnectionsPage = lazy(() => import('./pages/facility/ConnectionsPage'))
 const AlertsPage = lazy(() => import('./pages/AlertsPage'))
 const DemandPage = lazy(() => import('./pages/DemandPage'))
 const SavingsSimulator = lazy(() => import('./pages/SavingsSimulator'))
@@ -36,7 +34,6 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const CompressorFleet = lazy(() => import('./pages/CompressorFleet'))
 const EnergyOptimization = lazy(() => import('./pages/EnergyOptimization'))
 const EdgeAgentsPage = lazy(() => import('./pages/EdgeAgentsPage'))
-const LiveMonitorPage = lazy(() => import('./pages/LiveMonitorPage'))
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage'))
 const AlertRulesPage = lazy(() => import('./pages/AlertRulesPage'))
 const ReportsPage = lazy(() => import('./pages/ReportsPage'))
@@ -116,19 +113,21 @@ function AppRoutes() {
         <Route path="sites" element={<SitesPage />} />
         <Route path="operations" element={<OpsHome />} />
 
-        {/* Site detail — spec: /sites/:siteId */}
+        {/* Site detail */}
         <Route path="sites/:facilityId" element={<FacilityDetail />}>
           <Route index element={<FacilityOverview />} />
           <Route path="map" element={<FacilityMapPage />} />
           <Route path="zones" element={<ZonesPage />} />
           <Route path="equipment" element={<EquipmentPage />} />
-          <Route path="compressors" element={<CompressorFleet />} />
-          <Route path="monitor" element={<LiveMonitorPage />} />
           <Route path="energy" element={<EnergyOptimization />} />
           <Route path="controls" element={<ControlsPage />} />
-          <Route path="agents" element={<AgentsPage />} />
-          <Route path="integrations" element={<IntegrationsPage />} />
-          <Route path="bills" element={<BillsPage />} />
+          <Route path="connections" element={<ConnectionsPage />} />
+          {/* Removed tabs — compressors kept as full page, others redirect */}
+          <Route path="compressors" element={<CompressorFleet />} />
+          <Route path="monitor" element={<Navigate to="." replace />} />
+          <Route path="agents" element={<Navigate to="connections" replace />} />
+          <Route path="integrations" element={<Navigate to="connections" replace />} />
+          <Route path="bills" element={<Navigate to="energy" replace />} />
           <Route path="demand" element={<DemandTab />} />
         </Route>
 
@@ -138,13 +137,14 @@ function AppRoutes() {
           <Route path="map" element={<FacilityMapPage />} />
           <Route path="zones" element={<ZonesPage />} />
           <Route path="equipment" element={<EquipmentPage />} />
-          <Route path="compressors" element={<CompressorFleet />} />
-          <Route path="monitor" element={<LiveMonitorPage />} />
           <Route path="energy" element={<EnergyOptimization />} />
           <Route path="controls" element={<ControlsPage />} />
-          <Route path="agents" element={<AgentsPage />} />
-          <Route path="integrations" element={<IntegrationsPage />} />
-          <Route path="bills" element={<BillsPage />} />
+          <Route path="connections" element={<ConnectionsPage />} />
+          <Route path="compressors" element={<CompressorFleet />} />
+          <Route path="monitor" element={<Navigate to="." replace />} />
+          <Route path="agents" element={<Navigate to="connections" replace />} />
+          <Route path="integrations" element={<Navigate to="connections" replace />} />
+          <Route path="bills" element={<Navigate to="energy" replace />} />
           <Route path="demand" element={<DemandTab />} />
         </Route>
 

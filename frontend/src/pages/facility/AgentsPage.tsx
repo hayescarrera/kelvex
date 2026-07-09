@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Wifi, WifiOff, Loader2, Download, Copy, Check, Terminal } from 'lucide-react'
+import { Wifi, WifiOff, Loader2, Download, Copy, Check, Terminal, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useAgents, useRegisterAgent } from '../../hooks/useAgents'
+import { useAgents, useRegisterAgent, useUpdateAgent } from '../../hooks/useAgents'
 import { api, type EdgeAgent, type AgentConfigBundle } from '../../lib/api'
 import ResourceBar from '../../components/ui/ResourceBar'
 
@@ -45,9 +45,31 @@ function buildYaml(cfg: AgentConfigBundle): string {
       }
     }
   } else {
-    lines.push(`# No devices configured yet. Add devices via the platform,`)
-    lines.push(`# or let the agent auto-discover via network scan.`)
+    lines.push(`# No compressor devices configured yet.`)
+    lines.push(`# Add devices via the platform or use the network scan to discover them.`)
     lines.push(`devices: []`)
+  }
+
+  const zoneSensors = (cfg as typeof cfg & { zone_sensors?: unknown[] }).zone_sensors ?? []
+  if (zoneSensors.length > 0) {
+    lines.push(``)
+    lines.push(`zone_sensors:`)
+    for (const s of zoneSensors as Record<string, unknown>[]) {
+      lines.push(`  - sensor_id: "${s.sensor_id}"`)
+      lines.push(`    zone_id: "${s.zone_id}"`)
+      lines.push(`    name: "${s.name}"`)
+      lines.push(`    sensor_type: "${s.sensor_type}"`)
+      lines.push(`    unit: "${s.unit}"`)
+      lines.push(`    host: "${s.host}"`)
+      lines.push(`    port: ${s.port}`)
+      lines.push(`    slave_id: ${s.slave_id}`)
+      lines.push(`    register_address: ${s.register_address}`)
+      lines.push(`    register_type: "${s.register_type}"`)
+      lines.push(`    data_type: "${s.data_type}"`)
+      lines.push(`    scale: ${s.scale}`)
+      lines.push(`    offset: ${s.offset}`)
+      lines.push(`    poll_interval_sec: ${s.poll_interval_sec}`)
+    }
   }
 
   return lines.join('\n') + '\n'
@@ -79,65 +101,73 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function NewAgentSetup({ agent, facilityId }: { agent: EdgeAgent; facilityId: string }) {
-  const [downloading, setDownloading] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [installCmd, setInstallCmd] = useState<string | null>(null)
 
-  const handleDownload = async () => {
-    setDownloading(true)
+  const handleGenerate = async () => {
+    setLoading(true)
     try {
-      const cfg = await api.getAgentConfig(facilityId, agent.id)
-      const yaml = buildYaml(cfg)
-      downloadYaml(yaml, agent.name)
+      const result = await api.createSetupToken(facilityId, agent.id)
+      setInstallCmd(result.install_command)
     } catch {
-      toast.error('Failed to generate config')
+      toast.error('Failed to generate install command')
     } finally {
-      setDownloading(false)
+      setLoading(false)
     }
   }
-
-  const installCmd = `curl -fsSL https://github.com/hayescarrera/kelvex/releases/latest/download/install.sh | sudo bash`
 
   return (
     <div className="card" style={{ borderColor: 'var(--accent)', marginBottom: '1rem' }}>
       <div className="card-header" style={{ background: 'var(--accent-subtle, rgba(99,102,241,0.08))' }}>
-        <span>Agent registered: <strong>{agent.name}</strong></span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Terminal size={14} />
+          Agent registered: <strong>{agent.name}</strong>
+        </span>
       </div>
       <div className="card-body stack-md">
-        <p className="text-muted" style={{ fontSize: '0.88rem' }}>
-          Follow these steps on the gateway device (Raspberry Pi, Intel NUC, etc.):
+        <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: 0 }}>
+          Run one command on the gateway device. It installs the agent, writes your config,
+          and starts the service automatically.
         </p>
 
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-            <Terminal size={14} />
-            <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>1. Install the agent</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--surface-2)', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
-            <code style={{ flex: 1, fontSize: '0.78rem', wordBreak: 'break-all' }}>{installCmd}</code>
-            <CopyButton text={installCmd} />
-          </div>
-        </div>
-
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-            <Download size={14} />
-            <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>2. Download and copy your config</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button className="btn-primary" onClick={handleDownload} disabled={downloading} style={{ fontSize: '0.84rem' }}>
-              {downloading ? <Loader2 size={13} className="spin" /> : <Download size={13} />}
-              Download agent.yaml
+        {!installCmd ? (
+          <button
+            className="btn-primary"
+            onClick={handleGenerate}
+            disabled={loading}
+            style={{ fontSize: '0.84rem', alignSelf: 'flex-start' }}
+          >
+            {loading ? <Loader2 size={13} className="spin" /> : <Terminal size={13} />}
+            {loading ? 'Generating...' : 'Get Install Command'}
+          </button>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>Paste this into the terminal on your gateway device</span>
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'var(--surface-2)', borderRadius: 6, padding: '0.6rem 0.75rem',
+              border: '1px solid var(--border)',
+            }}>
+              <code style={{ flex: 1, fontSize: '0.78rem', wordBreak: 'break-all' }}>{installCmd}</code>
+              <CopyButton text={installCmd} />
+            </div>
+            <p style={{ fontSize: '0.77rem', color: 'var(--text-muted)', marginTop: 6 }}>
+              Link expires in 60 minutes. Auto-detects x86-64 / ARM64 / ARMv7 and installs a
+              systemd service that starts on boot.
+            </p>
+            <button
+              className="btn-ghost"
+              onClick={handleGenerate}
+              disabled={loading}
+              style={{ fontSize: '0.78rem', marginTop: 4 }}
+            >
+              {loading ? <Loader2 size={11} className="spin" /> : null}
+              Regenerate
             </button>
-            <span className="text-muted" style={{ fontSize: '0.8rem' }}>
-              Then: <code>sudo cp agent.yaml /etc/kelvex/agent.yaml && sudo systemctl restart kelvex-agent</code>
-            </span>
           </div>
-        </div>
-
-        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', background: 'var(--surface-2)', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
-          <span style={{ fontWeight: 600 }}>Agent key:</span>{' '}
-          <code>{agent.agent_key}</code>
-          <CopyButton text={agent.agent_key} />
-        </div>
+        )}
       </div>
     </div>
   )
@@ -270,6 +300,9 @@ function AgentCard({
   formatHeartbeat: (val: string | null | undefined) => string
 }) {
   const [downloading, setDownloading] = useState(false)
+  const [editingUrl, setEditingUrl] = useState(false)
+  const [urlValue, setUrlValue] = useState(agent.controller_url ?? '')
+  const updateAgent = useUpdateAgent(facilityId)
 
   const handleDownload = async () => {
     setDownloading(true)
@@ -282,6 +315,13 @@ function AgentCard({
     } finally {
       setDownloading(false)
     }
+  }
+
+  const handleSaveUrl = () => {
+    updateAgent.mutate(
+      { agentId: agent.id, data: { controller_url: urlValue || null } },
+      { onSuccess: () => setEditingUrl(false) }
+    )
   }
 
   return (
@@ -324,7 +364,47 @@ function AgentCard({
         <ResourceBar label="Disk" value={agent.disk_percent} color="var(--warning)" />
       )}
 
+      {/* Controller URL */}
       <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 4 }}>Controller URL</div>
+        {editingUrl ? (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              type="text"
+              value={urlValue}
+              onChange={e => setUrlValue(e.target.value)}
+              placeholder="http://192.168.1.50"
+              style={{ flex: 1, fontSize: '0.8rem', padding: '3px 8px' }}
+              autoFocus
+            />
+            <button className="btn-primary" onClick={handleSaveUrl} disabled={updateAgent.isPending}
+              style={{ fontSize: '0.78rem', padding: '3px 8px' }}>
+              {updateAgent.isPending ? <Loader2 size={11} className="spin" /> : <Save size={11} />}
+            </button>
+            <button className="btn-ghost" onClick={() => { setEditingUrl(false); setUrlValue(agent.controller_url ?? '') }}
+              style={{ fontSize: '0.78rem', padding: '3px 8px' }}>✕</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {agent.controller_url ? (
+              <>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {agent.controller_url}
+                </span>
+                <button className="btn-ghost" onClick={() => setEditingUrl(true)}
+                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}>Edit</button>
+              </>
+            ) : (
+              <button className="btn-ghost" onClick={() => setEditingUrl(true)}
+                style={{ fontSize: '0.78rem', padding: '2px 6px', color: 'var(--text-muted)' }}>
+                + Set controller URL
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: '0.5rem' }}>
         <button
           className="btn-ghost"
           onClick={handleDownload}

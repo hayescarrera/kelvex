@@ -6,12 +6,13 @@ interface StatCardProps {
   color: string
   value: string
   label: string
+  subtitle?: string
   delta?: string
   deltaLabel?: string
   deltaPositive?: boolean
 }
 
-export default function StatCard({ icon, color, value, label, delta, deltaLabel, deltaPositive }: StatCardProps) {
+export default function StatCard({ icon, color, value, label, subtitle, delta, deltaLabel, deltaPositive }: StatCardProps) {
   return (
     <div className="stat-card">
       <div
@@ -23,6 +24,7 @@ export default function StatCard({ icon, color, value, label, delta, deltaLabel,
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="stat-value">{value}</div>
         <div className="stat-label">{label}</div>
+        {subtitle && <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{subtitle}</div>}
         {delta && (
           <div style={{
             display: 'inline-flex',

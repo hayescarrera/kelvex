@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   Zap, DollarSign, TrendingDown, Clock, Sun, Moon, AlertTriangle, Gauge,
-  Thermometer, Target, Activity, BarChart3, Loader2,
+  Thermometer, Target, Activity, BarChart3, Loader2, Brain, CheckCircle2,
+  XCircle, ChevronDown, ChevronUp, Wrench, Droplets, Wind, BarChart2, Settings2,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -14,9 +15,272 @@ import LoadingState from '../components/ui/LoadingState'
 import EmptyState from '../components/ui/EmptyState'
 import ChartTooltip from '../components/ui/ChartTooltip'
 import { useSiteContext } from '../contexts/SiteContext'
-import { usePrecoolSchedule, useDemandForecast, useSavingsProjection } from '../hooks/useEnergy'
+import { usePrecoolSchedule, useDemandForecast, useSavingsProjection, useOpportunitiesSummary, useOpportunities, usePatchOpportunity } from '../hooks/useEnergy'
 import { api } from '../lib/api'
-import type { PowerReport, PowerSummary, EquipmentPowerBreakdown } from '../lib/api'
+import type { PowerReport, PowerSummary, EquipmentPowerBreakdown, EnergyOpportunity } from '../lib/api'
+
+const OPP_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  excess_lift:              { label: 'Excess Lift',             icon: <Wind size={15} />,     color: '#3b82f6' },
+  defrost_overrun:          { label: 'Defrost Overrun',         icon: <Thermometer size={15} />, color: '#f97316' },
+  defrost_underrun:         { label: 'Defrost Underrun',        icon: <Thermometer size={15} />, color: '#f97316' },
+  compressor_degradation:   { label: 'Compressor Degradation',  icon: <Activity size={15} />, color: '#ef4444' },
+  condenser_fouling:        { label: 'Condenser Fouling',       icon: <Droplets size={15} />, color: '#8b5cf6' },
+  charge_anomaly:           { label: 'Charge Anomaly',          icon: <BarChart2 size={15} />, color: '#ec4899' },
+  setpoint_drift:           { label: 'Setpoint Drift',          icon: <Settings2 size={15} />, color: '#14b8a6' },
+}
+
+function confidenceLabel(c: number): string {
+  if (c >= 0.85) return 'High'
+  if (c >= 0.65) return 'Medium'
+  return 'Low'
+}
+function confidenceColor(c: number): string {
+  if (c >= 0.85) return 'var(--success)'
+  if (c >= 0.65) return 'var(--warning)'
+  return 'var(--text-secondary)'
+}
+
+function OpportunityCard({ opp, onDismiss, onCreateWorkOrder }: {
+  opp: EnergyOpportunity
+  onDismiss: (id: string) => void
+  onCreateWorkOrder: (opp: EnergyOpportunity) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const meta = OPP_META[opp.opp_type] || { label: opp.opp_type, icon: <Zap size={15} />, color: 'var(--accent)' }
+
+  return (
+    <div style={{
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
+      background: 'var(--bg-primary)',
+      overflow: 'hidden',
+    }}>
+      <div
+        style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12 }}
+        onClick={() => setExpanded(e => !e)}
+      >
+        {/* Type icon */}
+        <div style={{
+          width: 32, height: 32, borderRadius: 8, flexShrink: 0, marginTop: 2,
+          background: meta.color + '18', color: meta.color,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {meta.icon}
+        </div>
+
+        {/* Main content */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{meta.label}</span>
+            {opp.confidence != null && (
+              <span style={{ fontSize: 11, color: confidenceColor(opp.confidence), fontWeight: 500 }}>
+                {confidenceLabel(opp.confidence)} confidence
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            {opp.recommended_action}
+          </div>
+        </div>
+
+        {/* Dollar value */}
+        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
+          {opp.estimated_usd_year != null && opp.estimated_usd_year > 0 && (
+            <>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--success)' }}>
+                ${Math.round(opp.estimated_usd_year).toLocaleString()}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>/yr</div>
+            </>
+          )}
+        </div>
+
+        <div style={{ color: 'var(--text-secondary)', flexShrink: 0, marginTop: 6 }}>
+          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </div>
+      </div>
+
+      {expanded && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 16px', background: 'var(--bg-secondary)' }}>
+          {/* Evidence grid */}
+          {opp.evidence && Object.keys(opp.evidence).length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 24px', marginBottom: 12 }}>
+              {Object.entries(opp.evidence)
+                .filter(([, v]) => v !== null && typeof v !== 'object')
+                .map(([k, v]) => (
+                  <div key={k} style={{ fontSize: 11 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{k.replace(/_/g, ' ')}: </span>
+                    <span style={{ fontWeight: 600 }}>{String(v)}</span>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {/* kWh/yr */}
+          {opp.estimated_kwh_year != null && opp.estimated_kwh_year > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12 }}>
+              {Math.round(opp.estimated_kwh_year).toLocaleString()} kWh/yr estimated waste
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn-primary"
+              style={{ fontSize: 11, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
+              onClick={e => { e.stopPropagation(); onCreateWorkOrder(opp) }}
+            >
+              <Wrench size={11} /> Create Work Order
+            </button>
+            <button
+              className="btn-secondary"
+              style={{ fontSize: 11, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-secondary)' }}
+              onClick={e => { e.stopPropagation(); onDismiss(opp.id) }}
+            >
+              <XCircle size={11} /> Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function oppToPriority(confidence: number | null): string {
+  if (!confidence) return 'medium'
+  if (confidence >= 0.85) return 'high'
+  if (confidence >= 0.65) return 'medium'
+  return 'low'
+}
+
+function IntelligenceTab({ facilityId }: { facilityId: string }) {
+  const [statusFilter, setStatusFilter] = useState<'open' | 'dismissed' | 'work_order_created'>('open')
+  const { data: summary } = useOpportunitiesSummary(facilityId)
+  const { data: oppsData, isLoading } = useOpportunities(facilityId, statusFilter)
+  const patch = usePatchOpportunity(facilityId)
+  const navigate = useNavigate()
+
+  function handleCreateWorkOrder(opp: EnergyOpportunity) {
+    const meta = OPP_META[opp.opp_type]
+    const title = meta ? `${meta.label} — ${opp.recommended_action?.split('.')[0] ?? 'Investigate'}` : opp.opp_type
+    const qs = new URLSearchParams({
+      prefill:     '1',
+      title:       title.slice(0, 120),
+      description: opp.recommended_action ?? '',
+      category:    'corrective',
+      priority:    oppToPriority(opp.confidence),
+    })
+    patch.mutate({ oppId: opp.id, status: 'work_order_created' })
+    navigate(`/maintenance?${qs.toString()}`)
+  }
+
+  const opps = oppsData?.opportunities ?? []
+
+  if (isLoading) return (
+    <div style={{ textAlign: 'center', padding: 60 }}>
+      <Loader2 size={24} className="spin" />
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Summary strip */}
+      {summary && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <div className="card" style={{ padding: '14px 16px' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>
+              Total Savings Potential
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--success)' }}>
+              ${Math.round(summary.total_estimated_usd_year).toLocaleString()}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>per year</div>
+          </div>
+          <div className="card" style={{ padding: '14px 16px' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>
+              Energy Waste
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>
+              {Math.round(summary.total_estimated_kwh_year / 1000).toLocaleString()}k
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>kWh/yr identified</div>
+          </div>
+          <div className="card" style={{ padding: '14px 16px' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 600 }}>
+              Open Findings
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>
+              {summary.by_type.reduce((s, r) => s + r.count, 0)}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>across {summary.by_type.length} categories</div>
+          </div>
+        </div>
+      )}
+
+      {/* Type breakdown pills */}
+      {summary && summary.by_type.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {summary.by_type.map(r => {
+            const meta = OPP_META[r.opp_type]
+            return (
+              <div key={r.opp_type} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '4px 10px', borderRadius: 20,
+                background: (meta?.color ?? '#6b7280') + '15',
+                border: `1px solid ${(meta?.color ?? '#6b7280')}30`,
+                fontSize: 12, color: meta?.color ?? 'var(--text-primary)',
+              }}>
+                {meta?.icon}
+                <span style={{ fontWeight: 600 }}>{meta?.label ?? r.opp_type}</span>
+                <span style={{ opacity: 0.7 }}>{r.count} · ${Math.round(r.estimated_usd_year / 1000)}k/yr</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Status filter */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+        {(['open', 'work_order_created', 'dismissed'] as const).map(s => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            style={{
+              padding: '6px 14px', fontSize: 12, fontWeight: statusFilter === s ? 600 : 400,
+              color: statusFilter === s ? 'var(--accent)' : 'var(--text-secondary)',
+              borderBottom: statusFilter === s ? '2px solid var(--accent)' : '2px solid transparent',
+              background: 'none', border: 'none', cursor: 'pointer', marginBottom: -1,
+            }}
+          >
+            {s === 'open' ? 'Open' : s === 'work_order_created' ? 'Work Orders' : 'Dismissed'}
+          </button>
+        ))}
+      </div>
+
+      {/* Opportunity list */}
+      {opps.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
+          <CheckCircle2 size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
+          <div style={{ fontSize: 14 }}>
+            {statusFilter === 'open' ? 'No open findings — system looks good.' : 'Nothing here yet.'}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {opps.map(opp => (
+            <OpportunityCard
+              key={opp.id}
+              opp={opp}
+              onDismiss={id => patch.mutate({ oppId: id, status: 'dismissed' })}
+              onCreateWorkOrder={handleCreateWorkOrder}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const POWER_RANGES = [
   { value: '1d', label: 'Last 24h', days: 1, interval: '1h' },
@@ -143,7 +407,7 @@ export default function EnergyOptimization() {
   const { facilityId } = useParams<{ facilityId: string }>()
   const { facilities } = useSiteContext()
   const facility = facilities.find(f => f.id === facilityId)
-  const [tab, setTab] = useState<'optimization' | 'history'>('optimization')
+  const [tab, setTab] = useState<'intelligence' | 'optimization' | 'history'>('intelligence')
 
   const { data: precool, isLoading: precoolLoading } = usePrecoolSchedule(facilityId)
   const { data: forecast, isLoading: forecastLoading } = useDemandForecast(facilityId)
@@ -162,22 +426,28 @@ export default function EnergyOptimization() {
 
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 20, marginTop: 4 }}>
-        {(['optimization', 'history'] as const).map(t => (
+        {([
+          { key: 'intelligence', label: 'Intelligence', icon: <Brain size={13} /> },
+          { key: 'optimization', label: 'Load Shifting', icon: <Zap size={13} /> },
+          { key: 'history',      label: 'Power History', icon: <BarChart3 size={13} /> },
+        ] as const).map(t => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={t.key}
+            onClick={() => setTab(t.key)}
             style={{
-              padding: '8px 16px', fontSize: 13, fontWeight: tab === t ? 600 : 400,
-              color: tab === t ? 'var(--accent)' : 'var(--text-secondary)',
-              borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent',
+              padding: '8px 14px', fontSize: 13, fontWeight: tab === t.key ? 600 : 400,
+              color: tab === t.key ? 'var(--accent)' : 'var(--text-secondary)',
+              borderBottom: tab === t.key ? '2px solid var(--accent)' : '2px solid transparent',
               background: 'none', border: 'none', cursor: 'pointer', marginBottom: -1,
+              display: 'flex', alignItems: 'center', gap: 5,
             }}
           >
-            {t === 'optimization' ? 'Optimization' : 'Power History'}
+            {t.icon}{t.label}
           </button>
         ))}
       </div>
 
+      {tab === 'intelligence' && facilityId && <IntelligenceTab facilityId={facilityId} />}
       {tab === 'history' && facilityId && <PowerHistoryTab facilityId={facilityId} />}
       {tab === 'optimization' && (
       <>

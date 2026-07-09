@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Activity, Plus, X, Heart, AlertTriangle, Zap,
-  RefreshCw, TrendingDown, Calendar,
+  RefreshCw, TrendingDown, Calendar, ExternalLink,
 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -136,6 +136,19 @@ function CompressorCard({ comp, facilityId, isSelected, onSelect }: {
           <span className={`badge badge-${comp.state === 'running' ? 'success' : comp.state === 'alarm' ? 'danger' : 'neutral'}`}>
             <span className="badge-dot" /> {comp.state}
           </span>
+          {comp.portal_url && (
+            <a
+              href={comp.portal_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="icon-btn-sm"
+              title="Open cloud portal"
+              onClick={e => e.stopPropagation()}
+              style={{ display: 'inline-flex', alignItems: 'center' }}
+            >
+              <ExternalLink size={13} />
+            </a>
+          )}
           <button className="icon-btn-sm" title="Health check" onClick={e => { e.stopPropagation(); healthCheck.mutate(comp.compressor_id) }}>
             <RefreshCw size={13} />
           </button>
@@ -332,7 +345,7 @@ function AddCompressorModal({ facilityId, onClose }: { facilityId: string; onClo
     name: '', manufacturer: '', model: '', tag: '',
     compressor_type: 'screw', refrigerant: 'NH3',
     hp: '', capacity_tons: '', rack_name: '',
-    refrigerant_charge_lbs: '',
+    refrigerant_charge_lbs: '', portal_url: '',
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -348,6 +361,7 @@ function AddCompressorModal({ facilityId, onClose }: { facilityId: string; onClo
       capacity_tons: form.capacity_tons ? parseFloat(form.capacity_tons) : undefined,
       rack_name: form.rack_name || undefined,
       refrigerant_charge_lbs: form.refrigerant_charge_lbs ? parseFloat(form.refrigerant_charge_lbs) : undefined,
+      portal_url: form.portal_url || undefined,
     }, {
       onSuccess: () => onClose(),
     })
@@ -426,6 +440,10 @@ function AddCompressorModal({ facilityId, onClose }: { facilityId: string; onClo
           <div className="field">
             <label>Refrigerant charge (lbs)</label>
             <input type="number" value={form.refrigerant_charge_lbs} onChange={e => setForm({ ...form, refrigerant_charge_lbs: e.target.value })} placeholder="5000" />
+          </div>
+          <div className="field">
+            <label>Cloud Portal URL <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+            <input type="url" value={form.portal_url} onChange={e => setForm({ ...form, portal_url: e.target.value })} placeholder="https://connected.emerson.com/..." />
           </div>
           <div className="modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>

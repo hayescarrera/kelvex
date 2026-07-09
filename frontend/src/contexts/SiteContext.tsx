@@ -20,6 +20,8 @@ export function useSiteContext() {
   return useContext(SiteCtx)
 }
 
+const STORAGE_KEY = 'kelvex_active_site'
+
 export function SiteProvider({ children }: { children: ReactNode }) {
   const [site, setSiteState] = useState<Facility | null>(null)
 
@@ -31,10 +33,11 @@ export function SiteProvider({ children }: { children: ReactNode }) {
 
   const facilities = data?.facilities ?? []
 
-  // Restore persisted site selection
+  // Restore persisted site on load
   useEffect(() => {
-    const savedId = sessionStorage.getItem('coldgrid_site')
-    if (savedId && facilities.length > 0) {
+    if (facilities.length === 0) return
+    const savedId = localStorage.getItem(STORAGE_KEY)
+    if (savedId) {
       const found = facilities.find(f => f.id === savedId)
       if (found) setSiteState(found)
     }
@@ -43,9 +46,9 @@ export function SiteProvider({ children }: { children: ReactNode }) {
   const setSite = (f: Facility | null) => {
     setSiteState(f)
     if (f) {
-      sessionStorage.setItem('coldgrid_site', f.id)
+      localStorage.setItem(STORAGE_KEY, f.id)
     } else {
-      sessionStorage.removeItem('coldgrid_site')
+      localStorage.removeItem(STORAGE_KEY)
     }
   }
 

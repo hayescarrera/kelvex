@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import toast from 'react-hot-toast'
+import type { EnergyOpportunity } from '../lib/api'
 
 export function useRateWindows(facilityId: string | undefined, targetDate?: string) {
   return useQuery({
@@ -41,6 +42,37 @@ export function useSavingsProjection(facilityId: string | undefined) {
     queryKey: ['savings-projection', facilityId],
     queryFn: () => api.getSavingsProjection(facilityId!),
     enabled: !!facilityId,
+  })
+}
+
+export function useOpportunitiesSummary(facilityId: string | undefined) {
+  return useQuery({
+    queryKey: ['opp-summary', facilityId],
+    queryFn: () => api.getOpportunitiesSummary(facilityId!),
+    enabled: !!facilityId,
+    refetchInterval: 300_000,
+  })
+}
+
+export function useOpportunities(facilityId: string | undefined, status = 'open') {
+  return useQuery({
+    queryKey: ['opportunities', facilityId, status],
+    queryFn: () => api.getOpportunities(facilityId!, { status, limit: 100 }),
+    enabled: !!facilityId,
+    refetchInterval: 300_000,
+  })
+}
+
+export function usePatchOpportunity(facilityId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ oppId, status }: { oppId: string; status: string }) =>
+      api.patchOpportunity(facilityId, oppId, { status }),
+    onSuccess: (_data: EnergyOpportunity) => {
+      qc.invalidateQueries({ queryKey: ['opportunities', facilityId] })
+      qc.invalidateQueries({ queryKey: ['opp-summary', facilityId] })
+    },
+    onError: (e: Error) => toast.error(e.message),
   })
 }
 

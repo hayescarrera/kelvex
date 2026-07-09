@@ -1,23 +1,20 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useParams, Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { Upload, Edit3, Loader2, X } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import LoadingState from '../components/ui/LoadingState'
 import { useFacility, useUpdateFacility } from '../hooks/useFacilities'
 import { useUploadBills } from '../hooks/useBills'
+import { useSiteContext } from '../contexts/SiteContext'
 
 const TABS = [
-  { label: 'Overview', to: '.' },
-  { label: 'Floor Plan', to: 'map' },
-  { label: 'Zones', to: 'zones' },
-  { label: 'Equipment', to: 'equipment' },
-  { label: 'Compressors', to: 'compressors' },
-  { label: 'Live Monitor', to: 'monitor' },
-  { label: 'Energy', to: 'energy' },
-  { label: 'Controls', to: 'controls' },
-  { label: 'Agents', to: 'agents' },
-  { label: 'Integrations', to: 'integrations' },
-  { label: 'Bills', to: 'bills' },
+  { label: 'Overview',      to: '.'            },
+  { label: 'Floor Plan',    to: 'map'          },
+  { label: 'Zones',         to: 'zones'        },
+  { label: 'Equipment',     to: 'equipment'    },
+  { label: 'Intelligence',  to: 'energy'       },
+  { label: 'Controls',      to: 'controls'     },
+  { label: 'Connections',   to: 'connections'  },
 ]
 
 export default function FacilityDetail() {
@@ -27,6 +24,12 @@ export default function FacilityDetail() {
   const { data: facility, isLoading } = useFacility(facilityId!)
   const uploadBills = useUploadBills(facilityId!)
   const updateFacility = useUpdateFacility(facilityId!)
+  const { setSite } = useSiteContext()
+
+  // Keep sidebar in sync with whatever site you navigated to directly
+  useEffect(() => {
+    if (facility) setSite(facility)
+  }, [facility]) // eslint-disable-line react-hooks/exhaustive-deps
   const [showEdit, setShowEdit] = useState(false)
 
   // Edit form state

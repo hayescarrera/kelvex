@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Wrench, Plus, CheckCircle, AlertTriangle,
   RefreshCw, Calendar, ClipboardList, X, ShieldCheck,
@@ -133,12 +134,16 @@ interface CreateTaskModalProps {
   facilityId: string
   onClose: () => void
   onSuccess: () => void
+  initialValues?: { title?: string; description?: string; category?: string; priority?: string }
 }
 
-function CreateTaskModal({ facilityId, onClose, onSuccess }: CreateTaskModalProps) {
+function CreateTaskModal({ facilityId, onClose, onSuccess, initialValues }: CreateTaskModalProps) {
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState({
-    title: '', description: '', category: 'preventive', priority: 'medium',
+    title: initialValues?.title ?? '',
+    description: initialValues?.description ?? '',
+    category: initialValues?.category ?? 'preventive',
+    priority: initialValues?.priority ?? 'medium',
     is_recurring: false, recurrence_days: '', due_date: '',
   })
 
@@ -238,6 +243,7 @@ function CreateTaskModal({ facilityId, onClose, onSuccess }: CreateTaskModalProp
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MaintenancePage() {
   const { site, facilities } = useSiteContext()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [mainTab, setMainTab] = useState<MainTab>('tasks')
   const [taskTab, setTaskTab] = useState<TaskTab>('all')
   const [tasks, setTasks] = useState<MaintenanceTaskEntry[]>([])
@@ -248,6 +254,24 @@ export default function MaintenancePage() {
   const [eventsLoaded, setEventsLoaded] = useState(false)
   const [showCreateTask, setShowCreateTask] = useState(false)
   const [showLogEvent, setShowLogEvent] = useState(false)
+
+  const prefill = useMemo(() => {
+    if (!searchParams.get('prefill')) return undefined
+    return {
+      title:       searchParams.get('title')       ?? undefined,
+      description: searchParams.get('description') ?? undefined,
+      category:    searchParams.get('category')    ?? undefined,
+      priority:    searchParams.get('priority')    ?? undefined,
+    }
+  }, [searchParams])
+
+  // Auto-open create modal when arriving from Intelligence
+  useEffect(() => {
+    if (prefill) {
+      setShowCreateTask(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [prefill]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const facilityId = site?.id
 
@@ -563,6 +587,7 @@ export default function MaintenancePage() {
           facilityId={effectiveFacilityId}
           onClose={() => setShowCreateTask(false)}
           onSuccess={() => loadTasks()}
+          initialValues={prefill}
         />
       )}
       {showLogEvent && effectiveFacilityId && (

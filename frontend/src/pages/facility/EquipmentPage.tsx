@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { Plus, Trash2, Cpu } from 'lucide-react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Plus, Trash2, Cpu, Activity, ExternalLink } from 'lucide-react'
 import toast from 'react-hot-toast'
 import LoadingState from '../../components/ui/LoadingState'
 import EmptyState from '../../components/ui/EmptyState'
@@ -20,6 +20,7 @@ interface NewEquipmentForm {
   type: string
   manufacturer: string
   model: string
+  portal_url: string
 }
 
 const EMPTY_FORM: NewEquipmentForm = {
@@ -27,10 +28,12 @@ const EMPTY_FORM: NewEquipmentForm = {
   type: 'compressor',
   manufacturer: '',
   model: '',
+  portal_url: '',
 }
 
 export default function EquipmentPage() {
   const { facilityId } = useParams<{ facilityId: string }>()
+  const navigate = useNavigate()
   const { data: equipmentData, isLoading } = useEquipment(facilityId!)
   const equipment = equipmentData?.equipment ?? []
   const createEquipment = useCreateEquipment(facilityId!)
@@ -51,6 +54,7 @@ export default function EquipmentPage() {
         equipment_type: form.type,
         manufacturer: form.manufacturer || undefined,
         model: form.model || undefined,
+        portal_url: form.portal_url || undefined,
       },
       {
         onSuccess: () => {
@@ -81,7 +85,14 @@ export default function EquipmentPage() {
 
   return (
     <div className="stack-lg">
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button
+          className="btn-secondary"
+          onClick={() => navigate(`/sites/${facilityId}/compressors`)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}
+        >
+          <Activity size={14} /> Compressor Health
+        </button>
         <button
           className="btn-primary"
           onClick={() => setShowForm((v) => !v)}
@@ -141,6 +152,16 @@ export default function EquipmentPage() {
                     placeholder="e.g. ZR125KC"
                   />
                 </div>
+                <div className="field">
+                  <label>Cloud Portal URL <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+                  <input
+                    type="url"
+                    name="portal_url"
+                    value={form.portal_url}
+                    onChange={handleChange}
+                    placeholder="e.g. https://connected.emerson.com/..."
+                  />
+                </div>
               </div>
             </div>
             <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', padding: '0.75rem 1rem' }}>
@@ -183,6 +204,7 @@ export default function EquipmentPage() {
                   <th>Manufacturer</th>
                   <th>Model</th>
                   <th>Added</th>
+                  <th>Portal</th>
                   <th></th>
                 </tr>
               </thead>
@@ -207,6 +229,20 @@ export default function EquipmentPage() {
                           ? new Date(eq.created_at).toLocaleDateString()
                           : ''}
                       </span>
+                    </td>
+                    <td>
+                      {eq.portal_url ? (
+                        <a
+                          href={eq.portal_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="icon-btn icon-btn-sm"
+                          title="Open cloud portal"
+                          style={{ display: 'inline-flex' }}
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
                     </td>
                     <td>
                       <button

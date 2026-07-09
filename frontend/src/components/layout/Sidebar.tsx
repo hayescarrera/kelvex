@@ -59,7 +59,7 @@ function buildNavItems(
     { to: siteHref,     icon: <MapPin size={16} />,     label: 'Sites' },
     { to: '/alerts',    icon: <Bell size={16} />,       label: 'Alerts',  badge: alertBadge },
     { to: '/refrigerant', icon: <Thermometer size={16} />, label: 'Refrigerant & Compliance' },
-    { to: '/energy',    icon: <Zap size={16} />,        label: 'Energy & Cost' },
+    { to: '/energy',    icon: <Zap size={16} />,        label: 'Cost & Bills' },
     { to: '/maintenance', icon: <Wrench size={16} />,   label: 'Maintenance & Audit' },
     { to: '/documents', icon: <FileText size={16} />,   label: 'Documents' },
     { to: '/reports',   icon: <BarChart2 size={16} />,  label: 'Reports & Exports' },
