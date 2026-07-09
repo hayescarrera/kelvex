@@ -62,10 +62,23 @@ jobs:
     needs: [backend, frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # No continue-on-error here: a failed deploy must show red, not a green
-    # check over a stale production.
+    # No continue-on-error: a real deploy failure must show red. But until a
+    # VPS exists (no DEPLOY_HOST secret), skip with a notice instead of
+    # failing every push.
+    env:
+      HAS_DEPLOY_TARGET: ${{ secrets.DEPLOY_HOST != '' }}
     steps:
+      - name: Check deploy target
+        id: target
+        run: |
+          if [ "$HAS_DEPLOY_TARGET" = "true" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Deploy skipped — DEPLOY_HOST/DEPLOY_USER/DEPLOY_KEY secrets not configured (see docs/deploy-vps.md)"
+          fi
       - name: Deploy to VPS
+        if: steps.target.outputs.configured == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
