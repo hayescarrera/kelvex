@@ -118,6 +118,18 @@ func (c *Client) Poll() Reading {
 	return r
 }
 
+// ReadRegister reads a single register and returns the scaled value.
+// Exported so zone sensor polling in main can read individual points.
+func (c *Client) ReadRegister(reg config.Register) (float64, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.conn == nil {
+		return 0, fmt.Errorf("not connected")
+	}
+	c.conn.SetDeadline(time.Now().Add(5 * time.Second))
+	return c.readRegister(reg)
+}
+
 // WriteRegister writes a value to a holding register (for control operations).
 func (c *Client) WriteRegister(reg config.Register, value float64) error {
 	c.mu.Lock()

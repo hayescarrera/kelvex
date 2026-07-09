@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/kelvex/edge-agent/internal/config"
+	"github.com/kelvex/edge-agent/internal/integration"
 	"github.com/kelvex/edge-agent/internal/modbus"
 	"github.com/kelvex/edge-agent/internal/platform"
 	"github.com/kelvex/edge-agent/internal/scanner"
@@ -261,7 +262,42 @@ func main() {
 		}()
 	}
 
-	// 6. Prune loop (clean up old synced data)
+	// 6. Zone sensor poll loop (Modbus-based zone sensors)
+	if client != nil && len(cfg.ZoneSensors) > 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			zoneSensorLoop(ctx, client, cfg, logger)
+		}()
+	}
+
+	// 7. Danfoss AK-SM 800/800A local XML integrations
+	if client != nil {
+		for _, aksmCfg := range cfg.Integrations.DanfossAKSM {
+			aksmCfg := aksmCfg // capture for goroutine
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				integration.NewAKSMIntegration(aksmCfg, client, logger).Run(ctx)
+			}()
+			logger.Info("Danfoss AK-SM integration starting", "host", aksmCfg.Host)
+		}
+	}
+
+	// 8. MQTT zone sensor integrations
+	if client != nil {
+		for _, mqttCfg := range cfg.Integrations.MQTT {
+			mqttCfg := mqttCfg
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				integration.NewMQTTIntegration(mqttCfg, client, logger).Run(ctx)
+			}()
+			logger.Info("MQTT integration starting", "broker", mqttCfg.Broker)
+		}
+	}
+
+	// 9. Prune loop (clean up old synced data)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -571,6 +607,141 @@ func executeNetworkScan(ctx context.Context, client *platform.Client, buf *stora
 		"found":   len(result.Devices),
 		"devices": result.Devices,
 	}, ""
+}
+
+// ── Zone sensor poll loop ────────────────────────────
+//
+// Each zone sensor is polled on its own interval. Sensors that share a
+// host:port:slave_id use a single shared TCP connection to avoid opening
+// a separate socket per probe.
+
+func zoneSensorLoop(ctx context.Context, client *platform.Client, cfg *config.Config, logger *slog.Logger) {
+	if len(cfg.ZoneSensors) == 0 {
+		return
+	}
+
+	type connKey struct {
+		host    string
+		port    int
+		slaveID int
+	}
+	clients := make(map[connKey]*modbus.Client)
+
+	for _, sc := range cfg.ZoneSensors {
+		key := connKey{sc.Host, sc.Port, sc.SlaveID}
+		if _, exists := clients[key]; !exists {
+			devCfg := config.DeviceConfig{
+				Name:    fmt.Sprintf("zone_sensors_%s_%d", sc.Host, sc.Port),
+				Host:    sc.Host,
+				Port:    sc.Port,
+				SlaveID: sc.SlaveID,
+			}
+			mc := modbus.NewClient(devCfg, logger)
+			if err := mc.Connect(); err != nil {
+				logger.Warn("zone sensor device connect failed",
+					"host", sc.Host, "port", sc.Port, "error", err)
+			}
+			clients[key] = mc
+		}
+	}
+	defer func() {
+		for _, mc := range clients {
+			mc.Close()
+		}
+	}()
+
+	// Find the smallest poll interval to use as ticker base
+	minInterval := 30 * time.Second
+	for _, sc := range cfg.ZoneSensors {
+		if d := time.Duration(sc.PollIntervalSec) * time.Second; d < minInterval {
+			minInterval = d
+		}
+	}
+
+	ticker := time.NewTicker(minInterval)
+	defer ticker.Stop()
+
+	lastPoll := make(map[string]time.Time) // sensor_id → last poll time
+
+	logger.Info("zone sensor loop started", "sensors", len(cfg.ZoneSensors))
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			var batch []platform.ZoneSensorReading
+
+			for _, sc := range cfg.ZoneSensors {
+				interval := time.Duration(sc.PollIntervalSec) * time.Second
+				if last, ok := lastPoll[sc.SensorID]; ok && now.Sub(last) < interval {
+					continue
+				}
+
+				key := connKey{sc.Host, sc.Port, sc.SlaveID}
+				mc := clients[key]
+				if mc == nil {
+					continue
+				}
+
+				// Reconnect if needed
+				if !mc.Connected {
+					if err := mc.Connect(); err != nil {
+						logger.Warn("zone sensor reconnect failed",
+							"sensor", sc.Name, "error", err)
+						batch = append(batch, platform.ZoneSensorReading{
+							SensorID: sc.SensorID,
+							ZoneID:   sc.ZoneID,
+							Value:    0,
+							Unit:     sc.Unit,
+							Quality:  2, // bad — device unreachable
+							Time:     now.UTC().Format(time.RFC3339),
+						})
+						lastPoll[sc.SensorID] = now
+						continue
+					}
+				}
+
+				reg := config.Register{
+					Address:  sc.RegisterAddress,
+					Type:     sc.RegisterType,
+					DataType: sc.DataType,
+					Scale:    sc.Scale,
+					Offset:   sc.Offset,
+				}
+
+				val, err := mc.ReadRegister(reg)
+				quality := 0
+				if err != nil {
+					logger.Warn("zone sensor read failed",
+						"sensor", sc.Name, "address", sc.RegisterAddress, "error", err)
+					quality = 2
+					val = 0
+				}
+
+				lastPoll[sc.SensorID] = now
+				batch = append(batch, platform.ZoneSensorReading{
+					SensorID: sc.SensorID,
+					ZoneID:   sc.ZoneID,
+					Value:    val,
+					Unit:     sc.Unit,
+					Quality:  quality,
+					Time:     now.UTC().Format(time.RFC3339),
+				})
+			}
+
+			if len(batch) == 0 {
+				continue
+			}
+
+			resp, err := client.PushZoneReadings(batch)
+			if err != nil {
+				logger.Warn("push zone readings failed", "error", err, "count", len(batch))
+			} else {
+				logger.Debug("zone readings pushed", "inserted", resp.Inserted, "total", resp.Total)
+			}
+		}
+	}
 }
 
 // ── Prune loop ───────────────────────────────────────

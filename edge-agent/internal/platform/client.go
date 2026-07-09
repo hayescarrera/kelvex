@@ -112,6 +112,34 @@ func (c *Client) PushReadings(readings []modbus.Reading) (*IngestResponse, error
 	return &resp, err
 }
 
+// ── Zone Sensor Readings ───────────────────────────
+
+type ZoneSensorReadingPayload struct {
+	Readings []ZoneSensorReading `json:"readings"`
+}
+
+type ZoneSensorReading struct {
+	SensorID    string  `json:"sensor_id"`
+	ZoneID      string  `json:"zone_id"`
+	Value       float64 `json:"value"`
+	Unit        string  `json:"unit,omitempty"`
+	Quality     int     `json:"quality"`
+	Time        string  `json:"time"`
+	// SourceLabel is optional metadata passed through to the platform
+	// to identify unlinked readings (e.g. "aksm:192.168.1.100/CC01/S2").
+	SourceLabel string  `json:"source_label,omitempty"`
+}
+
+func (c *Client) PushZoneReadings(readings []ZoneSensorReading) (*IngestResponse, error) {
+	if len(readings) == 0 {
+		return &IngestResponse{Status: "ok", Inserted: 0}, nil
+	}
+	payload := ZoneSensorReadingPayload{Readings: readings}
+	var resp IngestResponse
+	err := c.post(fmt.Sprintf("/agents/%s/zone-readings", c.agentKey), payload, &resp)
+	return &resp, err
+}
+
 // ── Commands ───────────────────────────────────────
 
 type Command struct {

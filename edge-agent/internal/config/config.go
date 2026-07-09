@@ -12,10 +12,65 @@ import (
 )
 
 type Config struct {
-	Agent    AgentConfig    `yaml:"agent"`
-	Platform PlatformConfig `yaml:"platform"`
-	Devices  []DeviceConfig `yaml:"devices"`
-	Local    LocalConfig    `yaml:"local"`
+	Agent        AgentConfig        `yaml:"agent"`
+	Platform     PlatformConfig     `yaml:"platform"`
+	Devices      []DeviceConfig     `yaml:"devices"`
+	ZoneSensors  []ZoneSensorConfig `yaml:"zone_sensors"`
+	Integrations IntegrationConfig  `yaml:"integrations"`
+	Local        LocalConfig        `yaml:"local"`
+}
+
+// IntegrationConfig holds optional plug-and-play integrations.
+// These run alongside the Modbus poll loop and push data via the same
+// /agents/{key}/zone-readings endpoint the zone sensor loop uses.
+type IntegrationConfig struct {
+	DanfossAKSM []AKSMConfig `yaml:"danfoss_aksm"`
+	MQTT        []MQTTConfig `yaml:"mqtt"`
+}
+
+// AKSMConfig configures a Danfoss AK-SM 800 / AK-SM 800A local XML integration.
+// The AK-SM exposes all connected case controller temperatures over its built-in
+// HTTP XML interface — no Alsense cloud subscription or partner API needed.
+type AKSMConfig struct {
+	Host            string            `yaml:"host"`
+	Username        string            `yaml:"username"`
+	Password        string            `yaml:"password"`
+	PollIntervalSec int               `yaml:"poll_interval_sec"`
+	// ZoneMappings links AK-SM device IDs to Kelvex zone/sensor UUIDs.
+	// If empty the integration still polls — readings appear under
+	// sensor_id="" and the platform can map them later.
+	ZoneMappings []AKSMZoneMapping `yaml:"zone_mappings"`
+}
+
+type AKSMZoneMapping struct {
+	ControllerID string `yaml:"controller_id"` // e.g. "CC01" or the controller name
+	ZoneID       string `yaml:"zone_id"`
+	SensorID     string `yaml:"sensor_id"`
+	// TempPoint is the Danfoss parameter to use as the zone temperature.
+	// Common values: S2 (air-off/return air), S1 (suction), S3 (air-on).
+	// Defaults to S2.
+	TempPoint string `yaml:"temp_point"`
+}
+
+// MQTTConfig subscribes to one MQTT broker and routes incoming JSON payloads
+// to zone sensor readings. Works with Chirpstack, Monnit, ControlByWeb, and
+// any broker that publishes JSON temperature data.
+type MQTTConfig struct {
+	Broker   string             `yaml:"broker"`    // e.g. "tcp://192.168.1.50:1883"
+	ClientID string             `yaml:"client_id"` // defaults to "kelvex-agent"
+	Username string             `yaml:"username"`
+	Password string             `yaml:"password"`
+	Sensors  []MQTTSensorConfig `yaml:"sensors"`
+}
+
+type MQTTSensorConfig struct {
+	Topic    string `yaml:"topic"`     // e.g. "sensors/zone1/temp"
+	SensorID string `yaml:"sensor_id"` // Kelvex ZoneSensor UUID
+	ZoneID   string `yaml:"zone_id"`   // Kelvex Zone UUID
+	// ValueKey is a dot-notation path into the JSON payload.
+	// Examples: "temperature", "object.TempC_DS18B20", "data.value"
+	ValueKey string `yaml:"value_key"`
+	Unit     string `yaml:"unit"` // "F" or "C"
 }
 
 type AgentConfig struct {
@@ -53,6 +108,24 @@ type Register struct {
 	Desc     string  `yaml:"description"`
 }
 
+// ZoneSensorConfig describes a single Modbus-polled zone sensor (temp probe, humidity, door contact, etc.).
+type ZoneSensorConfig struct {
+	SensorID        string  `yaml:"sensor_id"`
+	ZoneID          string  `yaml:"zone_id"`
+	Name            string  `yaml:"name"`
+	SensorType      string  `yaml:"sensor_type"`   // temperature, humidity, door_contact, etc.
+	Unit            string  `yaml:"unit"`
+	Host            string  `yaml:"host"`
+	Port            int     `yaml:"port"`
+	SlaveID         int     `yaml:"slave_id"`
+	RegisterAddress uint16  `yaml:"register_address"`
+	RegisterType    string  `yaml:"register_type"`  // holding or input
+	DataType        string  `yaml:"data_type"`       // uint16, int16, float32, int32
+	Scale           float64 `yaml:"scale"`
+	Offset          float64 `yaml:"offset"`
+	PollIntervalSec int     `yaml:"poll_interval_sec"`
+}
+
 type LocalConfig struct {
 	// Local web dashboard
 	WebPort      int    `yaml:"web_port"`       // default 8080
@@ -86,7 +159,7 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
-	// Defaults
+	// Defaults for compressor devices
 	for i := range cfg.Devices {
 		if cfg.Devices[i].Port == 0 {
 			cfg.Devices[i].Port = 502
@@ -99,6 +172,47 @@ func Load(path string) (*Config, error) {
 		}
 		if cfg.Devices[i].Protocol == "" {
 			cfg.Devices[i].Protocol = "modbus_tcp"
+		}
+	}
+
+	// Defaults for AK-SM integrations
+	for i := range cfg.Integrations.DanfossAKSM {
+		if cfg.Integrations.DanfossAKSM[i].PollIntervalSec == 0 {
+			cfg.Integrations.DanfossAKSM[i].PollIntervalSec = 60
+		}
+		for j := range cfg.Integrations.DanfossAKSM[i].ZoneMappings {
+			if cfg.Integrations.DanfossAKSM[i].ZoneMappings[j].TempPoint == "" {
+				cfg.Integrations.DanfossAKSM[i].ZoneMappings[j].TempPoint = "S2"
+			}
+		}
+	}
+
+	// Defaults for MQTT integrations
+	for i := range cfg.Integrations.MQTT {
+		if cfg.Integrations.MQTT[i].ClientID == "" {
+			cfg.Integrations.MQTT[i].ClientID = "kelvex-agent"
+		}
+	}
+
+	// Defaults for zone sensors
+	for i := range cfg.ZoneSensors {
+		if cfg.ZoneSensors[i].Port == 0 {
+			cfg.ZoneSensors[i].Port = 502
+		}
+		if cfg.ZoneSensors[i].SlaveID == 0 {
+			cfg.ZoneSensors[i].SlaveID = 1
+		}
+		if cfg.ZoneSensors[i].PollIntervalSec == 0 {
+			cfg.ZoneSensors[i].PollIntervalSec = 30
+		}
+		if cfg.ZoneSensors[i].Scale == 0 {
+			cfg.ZoneSensors[i].Scale = 1.0
+		}
+		if cfg.ZoneSensors[i].RegisterType == "" {
+			cfg.ZoneSensors[i].RegisterType = "holding"
+		}
+		if cfg.ZoneSensors[i].DataType == "" {
+			cfg.ZoneSensors[i].DataType = "uint16"
 		}
 	}
 
