@@ -294,7 +294,7 @@ export default function CompliancePage() {
                   <thead>
                     <tr>
                       <th>Circuit</th>
-                      <th>Leak Rate (15% threshold)</th>
+                      <th>Leak Rate (20% threshold)</th>
                       <th>Status</th>
                       <th>Open Leaks</th>
                     </tr>

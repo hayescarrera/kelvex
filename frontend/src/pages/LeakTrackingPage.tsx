@@ -963,9 +963,9 @@ export default function LeakTrackingPage() {
                 <StatCard
                   icon={<Activity size={18} />}
                   color={
-                    aimActSummary.facility_summary.avg_leak_rate_pct != null && aimActSummary.facility_summary.avg_leak_rate_pct >= 15
+                    aimActSummary.facility_summary.avg_leak_rate_pct != null && aimActSummary.facility_summary.avg_leak_rate_pct >= 20
                       ? 'var(--danger)'
-                      : aimActSummary.facility_summary.avg_leak_rate_pct != null && aimActSummary.facility_summary.avg_leak_rate_pct >= 10
+                      : aimActSummary.facility_summary.avg_leak_rate_pct != null && aimActSummary.facility_summary.avg_leak_rate_pct >= 15
                         ? 'var(--warning)'
                         : 'var(--success)'
                   }
@@ -1010,15 +1010,15 @@ export default function LeakTrackingPage() {
                             f.circuit_name === circuit.circuit_name
                           )
                           const leakRateColor = circuit.leak_rate_pct == null ? 'var(--text-muted)'
-                            : circuit.leak_rate_pct >= 15 ? 'var(--danger)'
-                            : circuit.leak_rate_pct >= 10 ? 'var(--warning)'
+                            : circuit.leak_rate_pct >= 20 ? 'var(--danger)'
+                            : circuit.leak_rate_pct >= 15 ? 'var(--warning)'
                             : 'var(--success)'
                           const aimStatusBadge = circuit.status === 'exceeds_threshold' ? 'badge-danger'
                             : circuit.status === 'warning' ? 'badge-warning'
                             : circuit.status === 'no_charge_data' ? 'badge-neutral'
                             : 'badge-success'
-                          const aimStatusLabel = circuit.status === 'exceeds_threshold' ? 'Exceeds (>15%)'
-                            : circuit.status === 'warning' ? 'Warning (>10%)'
+                          const aimStatusLabel = circuit.status === 'exceeds_threshold' ? 'Exceeds (>20%)'
+                            : circuit.status === 'warning' ? 'Warning (>15%)'
                             : circuit.status === 'no_charge_data' ? 'No charge data'
                             : 'Compliant'
                           return (
@@ -1105,7 +1105,7 @@ export default function LeakTrackingPage() {
               <div style={{ marginTop: 14, padding: '10px 14px', background: 'var(--bg-secondary)', borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <ShieldCheck size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 1 }} />
                 <span>
-                  AIM Act thresholds for commercial refrigeration: <strong>&gt;10% annual leak rate</strong> triggers a warning; <strong>&gt;15%</strong> requires repair within 30 days.
+                  AIM Act thresholds for commercial refrigeration: <strong>&gt;15% annual leak rate</strong> triggers a warning; <strong>&gt;20%</strong> requires repair within 30 days.
                   Rates use a rolling 365-day window. Forecasts project 90 days forward — circuits need at least 3 refrigerant adds to generate a forecast.
                 </span>
               </div>

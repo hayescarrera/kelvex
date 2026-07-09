@@ -236,10 +236,10 @@ class TestForecastLinear:
         assert result["lbs_per_day"] > 0
 
     def test_aim_threshold_already_exceeded(self):
-        # Full charge 100 lbs; AIM threshold = 15 lbs; added 20 lbs in last 365 days
+        # Full charge 100 lbs; AIM threshold = 20 lbs (20%); added 25 lbs in last 365 days
         ts = [_ago(200), _ago(100)]
-        result = forecast_linear(ts, [10.0, 10.0], full_charge_lbs=100.0)
-        # current_annual_lbs = 20 > 15 → already breached → days_to_aim_threshold = 0
+        result = forecast_linear(ts, [12.5, 12.5], full_charge_lbs=100.0)
+        # current_annual_lbs = 25 > 20 → already breached → days_to_aim_threshold = 0
         assert result["days_to_aim_threshold"] == 0
 
     def test_no_full_charge_skips_aim_calculation(self):

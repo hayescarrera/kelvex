@@ -765,8 +765,9 @@ async def aim_act_summary(
     cutoff_365d = now - timedelta(days=365)
     period_days = 365
 
-    WARNING_THRESHOLD = 10.0
-    EXCEEDS_THRESHOLD = 15.0
+    from app.services.forecasting import AIM_THRESHOLD_PCT, AIM_WARNING_PCT
+    WARNING_THRESHOLD = AIM_WARNING_PCT
+    EXCEEDS_THRESHOLD = AIM_THRESHOLD_PCT
 
     # Fetch active circuits in scope
     circuits_q = select(RefrigerantCircuit).where(
@@ -864,3 +865,218 @@ async def aim_act_summary(
             "circuits_above_threshold": circuits_above_threshold,
         },
     }
+
+
+# ── AIM Act audit export package ─────────────────────────────────────────────
+
+@router.get("/aim-act/export")
+async def export_aim_act_package(
+    facility_id: UUID | None = Query(None),
+    days: int = Query(365, ge=30, le=1095),
+    current_user: User = Depends(require_permission("reports:generate")),
+    db: AsyncSession = Depends(get_db),
+):
+    """One-click auditor package: leak rates, additions, leak events, and
+    repair records as CSVs plus a methodology README, zipped.
+
+    This is the artifact behind the "auditor-ready export" claim — every
+    number is reproducible from the tables it is drawn from.
+    """
+    import csv
+    import io
+    import zipfile
+    from fastapi.responses import Response
+    from app.services.forecasting import AIM_THRESHOLD_PCT, AIM_WARNING_PCT
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days)
+
+    # Scope: explicit facility (must be accessible) or all accessible facilities
+    if facility_id:
+        await get_facility_scoped(facility_id, current_user, db)
+        scope_ids = [facility_id]
+    else:
+        accessible = await get_accessible_facility_ids(current_user, db)
+        fac_q = select(Facility.id).where(
+            Facility.org_id == current_user.org_id,
+            Facility.deleted_at == None,  # noqa: E711
+        )
+        if accessible is not None:
+            fac_q = fac_q.where(Facility.id.in_(accessible))
+        scope_ids = [row[0] for row in (await db.execute(fac_q)).all()]
+
+    fac_names = {
+        row[0]: row[1]
+        for row in (await db.execute(
+            select(Facility.id, Facility.name).where(Facility.id.in_(scope_ids))
+        )).all()
+    } if scope_ids else {}
+
+    def _fac(fid):
+        return fac_names.get(fid, str(fid))
+
+    def _dt(value):
+        return value.strftime("%Y-%m-%d %H:%M UTC") if value else ""
+
+    def _csv(header, rows):
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(header)
+        w.writerows(rows)
+        return buf.getvalue()
+
+    # ── Circuits + leak rates ────────────────────────────────────────────
+    circuits = (await db.execute(
+        select(RefrigerantCircuit).where(
+            RefrigerantCircuit.org_id == current_user.org_id,
+            RefrigerantCircuit.facility_id.in_(scope_ids) if scope_ids else False,
+            RefrigerantCircuit.is_active == True,  # noqa: E712
+        ).order_by(RefrigerantCircuit.name)
+    )).scalars().all()
+
+    summary_rows = []
+    for c in circuits:
+        added = float((await db.execute(
+            select(func.coalesce(func.sum(RefrigerantAdd.amount_lbs), 0.0)).where(
+                RefrigerantAdd.circuit_id == c.id,
+                RefrigerantAdd.added_at >= cutoff,
+            )
+        )).scalar() or 0.0)
+        last_add = (await db.execute(
+            select(func.max(RefrigerantAdd.added_at)).where(RefrigerantAdd.circuit_id == c.id)
+        )).scalar()
+        if c.full_charge_lbs and c.full_charge_lbs > 0:
+            rate = round(added / c.full_charge_lbs * 100, 2)
+            status_txt = (
+                "EXCEEDS THRESHOLD — repair required" if rate >= AIM_THRESHOLD_PCT
+                else "Warning — approaching threshold" if rate >= AIM_WARNING_PCT
+                else "Compliant"
+            )
+        else:
+            rate, status_txt = "", "No full-charge value recorded"
+        open_events = (await db.execute(
+            select(func.count(LeakEvent.id)).where(
+                LeakEvent.circuit_id == c.id,
+                LeakEvent.status.in_(["open", "investigating"]),
+            )
+        )).scalar() or 0
+        summary_rows.append([
+            _fac(c.facility_id), c.name, c.refrigerant_type,
+            c.full_charge_lbs or "", added, rate, status_txt,
+            open_events, _dt(last_add),
+        ])
+
+    summary_csv = _csv(
+        ["facility", "circuit", "refrigerant", "full_charge_lbs",
+         f"added_lbs_last_{days}d", "annual_leak_rate_pct", "compliance_status",
+         "open_leak_events", "last_addition"],
+        summary_rows,
+    )
+
+    # ── Refrigerant additions ────────────────────────────────────────────
+    circuit_names = {c.id: c.name for c in circuits}
+    adds = (await db.execute(
+        select(RefrigerantAdd).where(
+            RefrigerantAdd.org_id == current_user.org_id,
+            RefrigerantAdd.facility_id.in_(scope_ids) if scope_ids else False,
+            RefrigerantAdd.added_at >= cutoff,
+        ).order_by(RefrigerantAdd.added_at)
+    )).scalars().all()
+    adds_csv = _csv(
+        ["date", "facility", "circuit", "rack", "refrigerant", "amount_lbs",
+         "technician", "epa_cert", "cost_per_lb", "linked_leak_event", "notes"],
+        [[_dt(a.added_at), _fac(a.facility_id),
+          circuit_names.get(a.circuit_id, ""), a.rack_name, a.refrigerant_type,
+          a.amount_lbs, a.technician_name, a.technician_epa_cert or "",
+          a.cost_per_lb or "", str(a.leak_event_id) if a.leak_event_id else "",
+          a.notes or ""] for a in adds],
+    )
+
+    # ── Leak events ──────────────────────────────────────────────────────
+    events = (await db.execute(
+        select(LeakEvent).where(
+            LeakEvent.org_id == current_user.org_id,
+            LeakEvent.facility_id.in_(scope_ids) if scope_ids else False,
+            LeakEvent.detected_at >= cutoff,
+        ).order_by(LeakEvent.detected_at)
+    )).scalars().all()
+    events_csv = _csv(
+        ["event_id", "detected", "facility", "circuit", "rack",
+         "detection_method", "confidence", "status", "confirmed",
+         "repaired", "closed", "estimated_loss_lbs", "notes"],
+        [[str(e.id), _dt(e.detected_at), _fac(e.facility_id),
+          circuit_names.get(e.circuit_id, ""), e.rack_name,
+          e.detection_method, e.confidence, e.status, _dt(e.confirmed_at),
+          _dt(e.repaired_at), _dt(e.closed_at), e.estimated_loss_lbs or "",
+          e.notes or ""] for e in events],
+    )
+
+    # ── Repair records ───────────────────────────────────────────────────
+    repairs = (await db.execute(
+        select(RepairRecord).where(
+            RepairRecord.org_id == current_user.org_id,
+            RepairRecord.facility_id.in_(scope_ids) if scope_ids else False,
+            RepairRecord.repaired_at >= cutoff,
+        ).order_by(RepairRecord.repaired_at)
+    )).scalars().all()
+    repairs_csv = _csv(
+        ["repaired", "facility", "circuit", "rack", "description",
+         "technician", "company", "parts_replaced", "verified_leak_free",
+         "verification_method", "refrigerant_recovered_lbs",
+         "callback_detected", "callback_lbs_within_30d",
+         "linked_leak_event", "notes"],
+        [[_dt(r.repaired_at), _fac(r.facility_id),
+          circuit_names.get(r.circuit_id, ""), r.rack_name, r.description,
+          r.technician_name, r.technician_company or "",
+          r.parts_replaced or "", "yes" if r.verified_leak_free else "no",
+          r.verification_method or "",
+          r.refrigerant_recovered_lbs or "",
+          {True: "yes", False: "no"}.get(r.callback_detected, ""),
+          r.callback_lbs_within_30d or "",
+          str(r.leak_event_id) if r.leak_event_id else "",
+          r.notes or ""] for r in repairs],
+    )
+
+    readme = f"""KELVEX — AIM ACT COMPLIANCE PACKAGE
+Generated: {now:%Y-%m-%d %H:%M} UTC
+Scope: {"facility " + _fac(facility_id) if facility_id else f"{len(scope_ids)} facility(ies)"}
+Period: last {days} days (from {cutoff:%Y-%m-%d})
+
+METHODOLOGY
+Annual leak rate per circuit = (refrigerant added over the trailing 365 days
+/ full charge) x 100, per the EPA annualizing method for appliances with a
+full charge of 50 lb or more of an HFC or substitute subject to the AIM Act
+Leak Repair & Management Rule (40 CFR Part 84, Subpart C).
+
+Thresholds applied (commercial refrigeration):
+  - {AIM_THRESHOLD_PCT:.0f}%: leak rate at or above this requires repair within 30 days
+  - {AIM_WARNING_PCT:.0f}%: internal warning level (approaching threshold)
+
+FILES
+  leak_rate_summary.csv     Per-circuit leak rate and compliance status
+  refrigerant_additions.csv Every addition in the period, with technician and
+                            EPA certification where recorded
+  leak_events.csv           Detected/confirmed leak events and their lifecycle
+  repair_records.csv        Repairs with verification tests, recovered
+                            refrigerant (Section 608), and 30-day callback
+                            re-leak checks
+
+All rows are exported verbatim from the Kelvex system of record. Timestamps
+are UTC. Empty cells mean the value was not recorded.
+"""
+
+    zbuf = io.BytesIO()
+    with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("README.txt", readme)
+        zf.writestr("leak_rate_summary.csv", summary_csv)
+        zf.writestr("refrigerant_additions.csv", adds_csv)
+        zf.writestr("leak_events.csv", events_csv)
+        zf.writestr("repair_records.csv", repairs_csv)
+    zbuf.seek(0)
+
+    fname = f"kelvex-aim-act-package-{now:%Y%m%d}.zip"
+    return Response(
+        content=zbuf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )

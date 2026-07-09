@@ -6,9 +6,11 @@ Models available:
   - forecast_exponential_smoothing: Holt-Winters via statsmodels (≥6 monthly buckets)
   - select_and_run_forecast: dispatcher that picks the right model
 
-AIM Act thresholds used:
-  - "warning" threshold: 10% annual leak rate of full charge
-  - "AIM threshold": 15% annual leak rate of full charge
+AIM Act thresholds used (40 CFR 84 leak repair, commercial refrigeration
+with >= 15 lb charge — grocery/cold-storage racks fall here; industrial
+process refrigeration would be 30%, comfort cooling 10%):
+  - "warning" threshold: 15% annual leak rate of full charge (approaching)
+  - "AIM threshold": 20% annual leak rate — mandatory repair within 30 days
 
 Key design decisions:
   - current_annual_leak_rate_pct is computed from the actual trailing 365-day adds
@@ -28,8 +30,8 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # AIM Act annual leak rate thresholds (fraction of full charge)
-AIM_THRESHOLD_PCT = 15.0   # must repair ≥ this
-AIM_WARNING_PCT = 10.0     # approaching threshold
+AIM_THRESHOLD_PCT = 20.0   # must repair ≥ this (commercial refrigeration)
+AIM_WARNING_PCT = 15.0     # approaching threshold
 
 
 # ── Data helpers ──────────────────────────────────────────────────────────────
