@@ -8,12 +8,15 @@ A single circuit failure is caught and logged; the batch continues.
 import asyncio
 import logging
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 
 from sqlalchemy import select, and_, func
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.workers.celery_app import celery_app
-from app.core.database import AsyncSessionLocal
+from app.core.config import get_settings
 from app.models.org_feature import OrgFeature
 from app.models.refrigerant import RefrigerantCircuit, LeakEvent, RefrigerantAdd
 from app.models.compressor import Compressor, CompressorReading
@@ -28,6 +31,22 @@ from app.services.leak_detection import (
 from app.services.forecasting import select_and_run_forecast
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def _worker_sessions():
+    """Fresh engine per asyncio.run() call.
+
+    Celery runs each task in a new event loop; a module-level engine's pooled
+    asyncpg connections stay bound to the loop that created them, so reusing
+    them across tasks fails. NullPool gives every session its own connection
+    on the current loop, and dispose() closes everything before the loop dies.
+    """
+    engine = create_async_engine(get_settings().DATABASE_URL, poolclass=NullPool)
+    try:
+        yield async_sessionmaker(engine, expire_on_commit=False)
+    finally:
+        await engine.dispose()
 
 
 # ── Celery tasks ──────────────────────────────────────────────────────────────
@@ -50,36 +69,37 @@ async def _async_detection_batch() -> None:
     """Full detection pipeline for orgs with auto_detection enabled."""
     logger.info("Starting automated leak detection batch.")
 
-    async with AsyncSessionLocal() as db:
-        # 1. Orgs with auto_detection enabled
-        result = await db.execute(
-            select(OrgFeature.org_id).where(
-                and_(
-                    OrgFeature.feature_key == "auto_detection",
-                    OrgFeature.enabled.is_(True),
+    async with _worker_sessions() as session_factory:
+        async with session_factory() as db:
+            # 1. Orgs with auto_detection enabled
+            result = await db.execute(
+                select(OrgFeature.org_id).where(
+                    and_(
+                        OrgFeature.feature_key == "auto_detection",
+                        OrgFeature.enabled.is_(True),
+                    )
                 )
             )
-        )
-        org_ids = [row[0] for row in result.fetchall()]
+            org_ids = [row[0] for row in result.fetchall()]
 
-    if not org_ids:
-        logger.info("No orgs with auto_detection enabled.")
-        return
+        if not org_ids:
+            logger.info("No orgs with auto_detection enabled.")
+            return
 
-    logger.info("Running detection for %d orgs.", len(org_ids))
+        logger.info("Running detection for %d orgs.", len(org_ids))
 
-    for org_id in org_ids:
-        try:
-            await _detect_for_org(org_id)
-        except Exception:
-            logger.exception("Detection batch failed for org %s.", org_id)
+        for org_id in org_ids:
+            try:
+                await _detect_for_org(session_factory, org_id)
+            except Exception:
+                logger.exception("Detection batch failed for org %s.", org_id)
 
     logger.info("Detection batch complete.")
 
 
-async def _detect_for_org(org_id) -> None:
+async def _detect_for_org(session_factory: async_sessionmaker, org_id) -> None:
     """Run detection for all active circuits belonging to one org."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         result = await db.execute(
             select(RefrigerantCircuit).where(
                 and_(
@@ -92,14 +112,14 @@ async def _detect_for_org(org_id) -> None:
 
     for circuit in circuits:
         try:
-            await _detect_for_circuit(circuit)
+            await _detect_for_circuit(session_factory, circuit)
         except Exception:
             logger.exception(
                 "Detection failed for circuit %s (org %s).", circuit.id, org_id
             )
 
 
-async def _detect_for_circuit(circuit: RefrigerantCircuit) -> None:
+async def _detect_for_circuit(session_factory: async_sessionmaker, circuit: RefrigerantCircuit) -> None:
     """Run all detection signals for a single circuit and create a LeakEvent if warranted."""
     now = datetime.now(timezone.utc)
     circuit_id = circuit.id
@@ -112,7 +132,7 @@ async def _detect_for_circuit(circuit: RefrigerantCircuit) -> None:
     rack = None
     rack_name_str = "Unknown"
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # ── Rack + compressors ─────────────────────────────────────────────────
         if circuit.rack_id is not None:
             rack_result = await db.execute(
@@ -177,7 +197,7 @@ async def _detect_for_circuit(circuit: RefrigerantCircuit) -> None:
         return
 
     # ── Duplicate check + event creation ─────────────────────────────────────
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         cutoff_7d = now - timedelta(days=7)
         dup_result = await db.execute(
             select(LeakEvent).where(
@@ -261,35 +281,36 @@ async def _async_forecasting_batch() -> None:
     """Full forecasting pipeline for orgs with forecasting enabled."""
     logger.info("Starting refrigerant forecasting batch.")
 
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(OrgFeature.org_id).where(
-                and_(
-                    OrgFeature.feature_key == "forecasting",
-                    OrgFeature.enabled.is_(True),
+    async with _worker_sessions() as session_factory:
+        async with session_factory() as db:
+            result = await db.execute(
+                select(OrgFeature.org_id).where(
+                    and_(
+                        OrgFeature.feature_key == "forecasting",
+                        OrgFeature.enabled.is_(True),
+                    )
                 )
             )
-        )
-        org_ids = [row[0] for row in result.fetchall()]
+            org_ids = [row[0] for row in result.fetchall()]
 
-    if not org_ids:
-        logger.info("No orgs with forecasting enabled.")
-        return
+        if not org_ids:
+            logger.info("No orgs with forecasting enabled.")
+            return
 
-    logger.info("Running forecasting for %d orgs.", len(org_ids))
+        logger.info("Running forecasting for %d orgs.", len(org_ids))
 
-    for org_id in org_ids:
-        try:
-            await _forecast_for_org(org_id)
-        except Exception:
-            logger.exception("Forecasting batch failed for org %s.", org_id)
+        for org_id in org_ids:
+            try:
+                await _forecast_for_org(session_factory, org_id)
+            except Exception:
+                logger.exception("Forecasting batch failed for org %s.", org_id)
 
     logger.info("Forecasting batch complete.")
 
 
-async def _forecast_for_org(org_id) -> None:
+async def _forecast_for_org(session_factory: async_sessionmaker, org_id) -> None:
     """Update forecasts for all active circuits in an org."""
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         result = await db.execute(
             select(RefrigerantCircuit).where(
                 and_(
@@ -302,18 +323,18 @@ async def _forecast_for_org(org_id) -> None:
 
     for circuit in circuits:
         try:
-            await _forecast_for_circuit(circuit)
+            await _forecast_for_circuit(session_factory, circuit)
         except Exception:
             logger.exception(
                 "Forecasting failed for circuit %s (org %s).", circuit.id, org_id
             )
 
 
-async def _forecast_for_circuit(circuit: RefrigerantCircuit) -> None:
+async def _forecast_for_circuit(session_factory: async_sessionmaker, circuit: RefrigerantCircuit) -> None:
     """Compute and upsert the forecast for a single circuit."""
     now = datetime.now(timezone.utc)
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         adds_result = await db.execute(
             select(RefrigerantAdd).where(
                 RefrigerantAdd.circuit_id == circuit.id
@@ -334,7 +355,7 @@ async def _forecast_for_circuit(circuit: RefrigerantCircuit) -> None:
         horizon_days=90,
     )
 
-    async with AsyncSessionLocal() as db:
+    async with session_factory() as db:
         # Upsert: try to find existing row by circuit_id
         existing_result = await db.execute(
             select(CircuitForecast).where(CircuitForecast.circuit_id == circuit.id)

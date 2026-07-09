@@ -20,10 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped, require_permission
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.tunnel import TunnelSession
+from app.models.agent import EdgeAgent
 from app.services.audit_service import log_activity
 
 router = APIRouter(prefix="/tunnel", tags=["tunnel"])
@@ -58,22 +59,13 @@ def _session_to_dict(s: TunnelSession) -> dict:
         "end_reason": s.end_reason,
         "ip_address": s.ip_address,
         "notes": s.notes,
+        "controller_url": s.controller_url,
         "duration_seconds": duration_seconds,
     }
 
 
-async def _verify_facility(facility_id: UUID, user: User, db: AsyncSession) -> Facility:
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    fac = result.scalar_one_or_none()
-    if not fac:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return fac
+async def _verify_facility(facility_id: UUID, user: User, db: AsyncSession):
+    return await get_facility_scoped(facility_id, user, db)
 
 
 @router.get("/sessions")
@@ -81,7 +73,7 @@ async def list_sessions(
     facility_id: UUID | None = Query(None),
     active_only: bool = Query(False),
     limit: int = Query(100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("tunnel:access")),
     db: AsyncSession = Depends(get_db),
 ):
     q = select(TunnelSession).where(TunnelSession.org_id == current_user.org_id)
@@ -99,7 +91,7 @@ async def list_sessions(
 async def start_session(
     data: StartSessionRequest,
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("tunnel:access")),
     db: AsyncSession = Depends(get_db),
 ):
     await _verify_facility(data.facility_id, current_user, db)
@@ -107,6 +99,19 @@ async def start_session(
     ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     if ip:
         ip = ip.split(",")[0].strip()
+
+    # Copy controller_url from the agent record so the session is self-contained
+    controller_url = None
+    if data.agent_id:
+        agent_result = await db.execute(
+            select(EdgeAgent).where(
+                EdgeAgent.id == data.agent_id,
+                EdgeAgent.facility_id == data.facility_id,
+            )
+        )
+        agent = agent_result.scalar_one_or_none()
+        if agent:
+            controller_url = agent.controller_url
 
     session = TunnelSession(
         org_id=current_user.org_id,
@@ -117,6 +122,7 @@ async def start_session(
         target_device=data.target_device,
         ip_address=ip,
         notes=data.notes,
+        controller_url=controller_url,
         started_at=datetime.now(timezone.utc),
     )
     db.add(session)
@@ -137,7 +143,7 @@ async def start_session(
 async def end_session(
     session_id: UUID,
     data: EndSessionRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("tunnel:access")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(

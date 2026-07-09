@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
     String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Index,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -64,6 +65,9 @@ class ZoneReading(Base):
     __table_args__ = (
         Index("ix_zone_readings_sensor_time", "sensor_id", "recorded_at"),
         Index("ix_zone_readings_zone_time", "zone_id", "recorded_at"),
+        # Idempotency: edge agents retry batches after network failures —
+        # one reading per sensor per timestamp, duplicates dropped on insert
+        UniqueConstraint("sensor_id", "recorded_at", name="uq_zone_reading_sensor_recorded_at"),
         {"extend_existing": True},
     )
 

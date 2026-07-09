@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped, require_permission
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.agent import EdgeAgent
@@ -45,18 +45,8 @@ from app.schemas.control import (
 router = APIRouter(prefix="/facilities/{facility_id}/controls", tags=["controls"])
 
 
-async def _get_facility(facility_id: UUID, user: User, db: AsyncSession) -> Facility:
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return facility
+async def _get_facility(facility_id: UUID, user: User, db: AsyncSession):
+    return await get_facility_scoped(facility_id, user, db)
 
 
 # ── Control Sequences ──────────────────────────────
@@ -66,7 +56,7 @@ async def _get_facility(facility_id: UUID, user: User, db: AsyncSession) -> Faci
 async def create_sequence(
     facility_id: UUID,
     data: ControlSequenceCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("automation:create")),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new control sequence for a facility."""
@@ -124,7 +114,7 @@ async def get_sequence(
 async def update_sequence(
     facility_id: UUID, sequence_id: UUID,
     data: ControlSequenceUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("automation:edit")),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a control sequence's definition."""
@@ -147,7 +137,7 @@ async def update_sequence(
 @router.delete("/sequences/{sequence_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_sequence(
     facility_id: UUID, sequence_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("automation:delete")),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a control sequence."""
@@ -168,7 +158,7 @@ async def delete_sequence(
 async def run_sequence(
     facility_id: UUID, sequence_id: UUID,
     body: dict = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("control:setpoint")),
     db: AsyncSession = Depends(get_db),
 ):
     """Manually trigger a control sequence — creates CommandQueue entries for each step.
@@ -289,7 +279,7 @@ async def run_sequence(
 async def create_schedule(
     facility_id: UUID,
     data: ScheduleCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("automation:create")),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new schedule for a facility."""
@@ -321,7 +311,7 @@ async def list_schedules(
 @router.delete("/schedules/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_schedule(
     facility_id: UUID, schedule_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("automation:delete")),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a schedule."""
@@ -343,7 +333,7 @@ async def delete_schedule(
 async def create_rule(
     facility_id: UUID,
     data: AutomationRuleCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("automation:create")),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new automation rule for a facility."""
@@ -380,7 +370,7 @@ async def list_rules(
 async def update_rule(
     facility_id: UUID, rule_id: UUID,
     data: AutomationRuleUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("automation:edit")),
     db: AsyncSession = Depends(get_db),
 ):
     """Update an automation rule."""
@@ -403,7 +393,7 @@ async def update_rule(
 @router.delete("/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_rule(
     facility_id: UUID, rule_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("automation:delete")),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete an automation rule."""

@@ -31,17 +31,9 @@ router = APIRouter(tags=["reports"])
 
 
 async def _verify_facility_access(facility_id: UUID, user: User, db: AsyncSession):
-    """Verify the facility belongs to the current user's org. Raises 404 if not."""
-    from fastapi import HTTPException
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Facility not found")
+    """Org scope + per-facility grants, same as every other router."""
+    from app.core.security import get_facility_scoped
+    await get_facility_scoped(facility_id, user, db)
 
 
 # ── Power Consumption ────────────────────────────────

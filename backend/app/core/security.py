@@ -105,6 +105,41 @@ def require_role(*allowed_roles: str):
     return _check
 
 
+async def get_facility_scoped(facility_id, user, db: AsyncSession):
+    """Fetch a facility the user may act on.
+
+    Org-scoped, not soft-deleted, and — for roles without global access —
+    covered by a UserFacilityAccess grant. 404 in every failure case so a
+    caller can't distinguish "exists but not yours" from "doesn't exist".
+    """
+    from fastapi import HTTPException
+    from app.models.facility import Facility
+    from app.models.user import UserFacilityAccess
+
+    result = await db.execute(
+        select(Facility).where(
+            Facility.id == facility_id,
+            Facility.org_id == user.org_id,
+            Facility.deleted_at == None,  # noqa: E711
+        )
+    )
+    facility = result.scalar_one_or_none()
+
+    if facility is not None and not user.has_global_access:
+        grant = await db.execute(
+            select(UserFacilityAccess.id).where(
+                UserFacilityAccess.user_id == user.id,
+                UserFacilityAccess.facility_id == facility_id,
+            )
+        )
+        if grant.first() is None:
+            facility = None
+
+    if not facility:
+        raise HTTPException(status_code=404, detail="Facility not found")
+    return facility
+
+
 async def get_accessible_facility_ids(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

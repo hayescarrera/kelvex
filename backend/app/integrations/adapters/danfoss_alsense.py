@@ -113,7 +113,20 @@ class DanfossAlsenseAdapter(BaseAdapter):
         return devices
 
     async def poll(self, device_map: dict) -> list[TelemetryReading]:
-        """Poll current values from all mapped devices."""
+        """Poll current values from all mapped devices.
+
+        device_map entry format:
+          {
+            "<alsense_controller_id>": {
+              "equipment_id": "<uuid>",
+              "metrics": {"<param_name>": {"metric_name": "...", "unit": "..."}},
+              // Optional — set when this controller is a case controller mapped to a zone:
+              "zone_id": "<uuid>",
+              "sensor_id": "<uuid>",   // ZoneSensor record, may be None
+              "zone_temp_param": "S2", // which Alsense parameter name is zone temp
+            }
+          }
+        """
         await self.authenticate()
         readings = []
         now = datetime.now(timezone.utc)
@@ -121,9 +134,11 @@ class DanfossAlsenseAdapter(BaseAdapter):
         for ext_id, mapping in device_map.items():
             equipment_id = UUID(mapping["equipment_id"])
             metrics = mapping.get("metrics", {})
+            zone_id_str = mapping.get("zone_id")
+            sensor_id_str = mapping.get("sensor_id")
+            zone_temp_param = mapping.get("zone_temp_param", "S2")
 
             try:
-                # Get current parameter values for this controller
                 resp = await self._client.get(
                     f"{self.base_url}/v1/controllers/{ext_id}/parameters/values",
                     headers=self._headers(),
@@ -133,24 +148,44 @@ class DanfossAlsenseAdapter(BaseAdapter):
 
                 for param in values:
                     param_name = param.get("name", "")
+                    value = param.get("value")
+                    if value is None:
+                        continue
+                    quality = 0 if param.get("quality") == "good" else 2
+
+                    # Standard telemetry via configured metric map
                     if param_name in metrics:
                         metric_cfg = metrics[param_name]
-                        value = param.get("value")
-                        if value is not None:
-                            try:
-                                readings.append(TelemetryReading(
-                                    equipment_id=equipment_id,
-                                    metric_name=metric_cfg["metric_name"],
-                                    value=float(value),
-                                    unit=metric_cfg.get("unit", param.get("unit", "")),
-                                    timestamp=now,
-                                    quality=0 if param.get("quality") == "good" else 2,
-                                ))
-                            except (ValueError, TypeError):
-                                continue
+                        try:
+                            readings.append(TelemetryReading(
+                                equipment_id=equipment_id,
+                                metric_name=metric_cfg["metric_name"],
+                                value=float(value),
+                                unit=metric_cfg.get("unit", param.get("unit", "")),
+                                timestamp=now,
+                                quality=quality,
+                            ))
+                        except (ValueError, TypeError):
+                            continue
 
-            except httpx.HTTPStatusError as e:
-                # Log but continue — don't let one device failure kill the poll
+                    # Zone temperature: emit a zone-linked reading for the polling
+                    # engine to write to ZoneReading and update Zone.current_temp
+                    if zone_id_str and param_name == zone_temp_param:
+                        try:
+                            readings.append(TelemetryReading(
+                                equipment_id=equipment_id,
+                                metric_name="air_off_temp",
+                                value=float(value),
+                                unit=param.get("unit", "degF"),
+                                timestamp=now,
+                                quality=quality,
+                                zone_id=UUID(zone_id_str),
+                                sensor_id=UUID(sensor_id_str) if sensor_id_str else None,
+                            ))
+                        except (ValueError, TypeError):
+                            continue
+
+            except httpx.HTTPStatusError:
                 continue
 
         return readings

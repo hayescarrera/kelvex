@@ -17,30 +17,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped
 from app.models.user import User
 from app.models.facility import Facility, Equipment
 from app.models.zone import Zone, ZoneEquipment
+from app.models.zone_sensor import ZoneSensor
 from app.schemas.zone import (
     ZoneCreate, ZoneUpdate, ZoneResponse, ZoneListResponse,
     ZoneEquipmentCreate, ZoneEquipmentResponse,
+    ZoneSensorCreate, ZoneSensorUpdate, ZoneSensorResponse, ZoneSensorListResponse,
 )
 
 router = APIRouter(prefix="/facilities/{facility_id}/zones", tags=["zones"])
 
 
-async def _get_facility(facility_id: UUID, user: User, db: AsyncSession) -> Facility:
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return facility
+async def _get_facility(facility_id: UUID, user: User, db: AsyncSession):
+    return await get_facility_scoped(facility_id, user, db)
 
 
 async def _get_zone(zone_id: UUID, facility_id: UUID, db: AsyncSession) -> Zone:
@@ -182,4 +174,154 @@ async def unassign_equipment(
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     await db.delete(assignment)
+    await db.commit()
+
+
+# ── Zone Sensor CRUD ─────────────────────────────────────────────────────────
+
+def _sensor_to_response(s: ZoneSensor) -> ZoneSensorResponse:
+    m = s.metadata_ or {}
+    return ZoneSensorResponse(
+        id=s.id,
+        zone_id=s.zone_id,
+        name=s.name,
+        sensor_type=s.sensor_type,
+        unit=s.unit,
+        location_desc=s.location_desc,
+        alarm_high=s.alarm_high,
+        alarm_low=s.alarm_low,
+        warn_high=s.warn_high,
+        warn_low=s.warn_low,
+        current_value=s.current_value,
+        current_state=s.current_state or "normal",
+        last_reading_at=s.last_reading_at,
+        poll_interval_sec=s.poll_interval_sec,
+        enabled=s.enabled,
+        created_at=s.created_at,
+        host=m.get("host"),
+        port=m.get("port", 502),
+        slave_id=m.get("slave_id", 1),
+        register_address=m.get("register_address"),
+        register_type=m.get("register_type", "holding"),
+        data_type=m.get("data_type", "uint16"),
+        scale=m.get("scale", 1.0),
+        offset=m.get("offset", 0.0),
+    )
+
+
+@router.post("/{zone_id}/sensors", response_model=ZoneSensorResponse,
+             status_code=status.HTTP_201_CREATED)
+async def create_zone_sensor(
+    facility_id: UUID,
+    zone_id: UUID,
+    data: ZoneSensorCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_facility(facility_id, current_user, db)
+    await _get_zone(zone_id, facility_id, db)
+
+    modbus_meta = {
+        "host": data.host,
+        "port": data.port,
+        "slave_id": data.slave_id,
+        "register_address": data.register_address,
+        "register_type": data.register_type,
+        "data_type": data.data_type,
+        "scale": data.scale,
+        "offset": data.offset,
+    }
+    sensor = ZoneSensor(
+        zone_id=zone_id,
+        name=data.name,
+        sensor_type=data.sensor_type,
+        unit=data.unit,
+        location_desc=data.location_desc,
+        alarm_high=data.alarm_high,
+        alarm_low=data.alarm_low,
+        warn_high=data.warn_high,
+        warn_low=data.warn_low,
+        poll_interval_sec=data.poll_interval_sec,
+        enabled=data.enabled,
+        metadata_=modbus_meta,
+    )
+    db.add(sensor)
+    await db.flush()
+    await db.refresh(sensor)
+    return _sensor_to_response(sensor)
+
+
+@router.get("/{zone_id}/sensors", response_model=ZoneSensorListResponse)
+async def list_zone_sensors(
+    facility_id: UUID,
+    zone_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_facility(facility_id, current_user, db)
+    await _get_zone(zone_id, facility_id, db)
+    result = await db.execute(
+        select(ZoneSensor).where(ZoneSensor.zone_id == zone_id).order_by(ZoneSensor.name)
+    )
+    sensors = result.scalars().all()
+    return ZoneSensorListResponse(
+        sensors=[_sensor_to_response(s) for s in sensors],
+        total=len(sensors),
+    )
+
+
+@router.patch("/{zone_id}/sensors/{sensor_id}", response_model=ZoneSensorResponse)
+async def update_zone_sensor(
+    facility_id: UUID,
+    zone_id: UUID,
+    sensor_id: UUID,
+    data: ZoneSensorUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_facility(facility_id, current_user, db)
+    await _get_zone(zone_id, facility_id, db)
+    result = await db.execute(
+        select(ZoneSensor).where(ZoneSensor.id == sensor_id, ZoneSensor.zone_id == zone_id)
+    )
+    sensor = result.scalar_one_or_none()
+    if not sensor:
+        raise HTTPException(status_code=404, detail="Sensor not found")
+
+    direct_fields = {"name", "sensor_type", "unit", "location_desc",
+                     "alarm_high", "alarm_low", "warn_high", "warn_low",
+                     "poll_interval_sec", "enabled"}
+    modbus_fields = {"host", "port", "slave_id", "register_address",
+                     "register_type", "data_type", "scale", "offset"}
+
+    update = data.model_dump(exclude_unset=True)
+    for field in direct_fields:
+        if field in update:
+            setattr(sensor, field, update[field])
+
+    modbus_updates = {k: v for k, v in update.items() if k in modbus_fields}
+    if modbus_updates:
+        sensor.metadata_ = {**(sensor.metadata_ or {}), **modbus_updates}
+
+    await db.flush()
+    await db.refresh(sensor)
+    return _sensor_to_response(sensor)
+
+
+@router.delete("/{zone_id}/sensors/{sensor_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_zone_sensor(
+    facility_id: UUID,
+    zone_id: UUID,
+    sensor_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_facility(facility_id, current_user, db)
+    result = await db.execute(
+        select(ZoneSensor).where(ZoneSensor.id == sensor_id, ZoneSensor.zone_id == zone_id)
+    )
+    sensor = result.scalar_one_or_none()
+    if not sensor:
+        raise HTTPException(status_code=404, detail="Sensor not found")
+    await db.delete(sensor)
     await db.commit()

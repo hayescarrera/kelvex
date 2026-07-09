@@ -128,7 +128,20 @@ class EmersonOversightAdapter(BaseAdapter):
         return devices
 
     async def poll(self, device_map: dict) -> list[TelemetryReading]:
-        """Poll current values from E2/E3 controllers."""
+        """Poll current values from E2/E3 controllers.
+
+        device_map entry format:
+          {
+            "<controller_or_circuit_id>": {
+              "equipment_id": "<uuid>",
+              "metrics": {"<point_name>": {"metric_name": "...", "unit": "..."}},
+              // Optional — set when this circuit monitors a cold storage zone:
+              "zone_id": "<uuid>",
+              "sensor_id": "<uuid>",
+              "zone_temp_param": "Return Air Temp",  // default
+            }
+          }
+        """
         await self.authenticate()
         readings = []
         now = datetime.now(timezone.utc)
@@ -136,15 +149,15 @@ class EmersonOversightAdapter(BaseAdapter):
         for ext_id, mapping in device_map.items():
             equipment_id = UUID(mapping["equipment_id"])
             metrics = mapping.get("metrics", {})
+            zone_id_str = mapping.get("zone_id")
+            sensor_id_str = mapping.get("sensor_id")
+            zone_temp_param = mapping.get("zone_temp_param", "Return Air Temp")
 
             try:
-                # Determine if this is a controller or circuit
                 parts = ext_id.split(":")
                 if len(parts) == 1:
-                    # Direct controller
                     url = f"{self.base_url}/v1/controllers/{ext_id}/points/values"
                 else:
-                    # Circuit under a controller
                     ctrl_id, circuit_id = parts[0], parts[1]
                     url = f"{self.base_url}/v1/controllers/{ctrl_id}/circuits/{circuit_id}/values"
 
@@ -153,21 +166,39 @@ class EmersonOversightAdapter(BaseAdapter):
 
                 for point in resp.json().get("values", []):
                     point_name = point.get("name", "")
+                    value = point.get("value")
+                    if value is None:
+                        continue
+
                     if point_name in metrics:
                         metric_cfg = metrics[point_name]
-                        value = point.get("value")
-                        if value is not None:
-                            try:
-                                readings.append(TelemetryReading(
-                                    equipment_id=equipment_id,
-                                    metric_name=metric_cfg["metric_name"],
-                                    value=float(value),
-                                    unit=metric_cfg.get("unit", point.get("unit", "")),
-                                    timestamp=now,
-                                    quality=0,
-                                ))
-                            except (ValueError, TypeError):
-                                continue
+                        try:
+                            readings.append(TelemetryReading(
+                                equipment_id=equipment_id,
+                                metric_name=metric_cfg["metric_name"],
+                                value=float(value),
+                                unit=metric_cfg.get("unit", point.get("unit", "")),
+                                timestamp=now,
+                                quality=0,
+                            ))
+                        except (ValueError, TypeError):
+                            continue
+
+                    if zone_id_str and point_name == zone_temp_param:
+                        try:
+                            readings.append(TelemetryReading(
+                                equipment_id=equipment_id,
+                                metric_name="air_off_temp",
+                                value=float(value),
+                                unit=point.get("unit", "degF"),
+                                timestamp=now,
+                                quality=0,
+                                zone_id=UUID(zone_id_str),
+                                sensor_id=UUID(sensor_id_str) if sensor_id_str else None,
+                            ))
+                        except (ValueError, TypeError):
+                            continue
+
             except Exception:
                 continue
 

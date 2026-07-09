@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped, require_permission
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.compressor import Compressor
@@ -35,17 +35,7 @@ router = APIRouter(prefix="/facilities/{facility_id}/control", tags=["plant-cont
 
 
 async def _get_facility(facility_id, user, db):
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    fac = result.scalar_one_or_none()
-    if not fac:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return fac
+    return await get_facility_scoped(facility_id, user, db)
 
 
 async def _get_agent_for_facility(facility_id, db):
@@ -98,12 +88,22 @@ async def control_compressor(
       write_register — {"compressor_id": "...", "action": "write_register", "register": "capacity_setpoint", "value": 75}
     """
     await _get_facility(facility_id, current_user, db)
-    agent = await _get_agent_for_facility(facility_id, db)
 
     compressor_id = body.get("compressor_id")
     action = body.get("action")
     if not compressor_id or not action:
         raise HTTPException(status_code=400, detail="compressor_id and action required")
+
+    # Authorization before resource-state checks: start/stop is granted more
+    # broadly (operators) than setpoint writes.
+    needed_perm = "control:start_stop" if action in ("start", "stop") else "control:setpoint"
+    if not current_user.has_perm(needed_perm):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Insufficient permissions: requires {needed_perm}",
+        )
+
+    agent = await _get_agent_for_facility(facility_id, db)
 
     # Get compressor
     result = await db.execute(
@@ -236,7 +236,7 @@ async def control_compressor(
 async def trigger_defrost(
     facility_id: _uuid.UUID,
     body: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("control:defrost")),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -318,7 +318,7 @@ async def trigger_defrost(
 async def activate_demand_response(
     facility_id: _uuid.UUID,
     body: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("control:demand_response")),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -399,7 +399,7 @@ async def activate_demand_response(
 async def adjust_zone_setpoint(
     facility_id: _uuid.UUID,
     body: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("control:setpoint")),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -674,7 +674,7 @@ async def list_plant_commands(
 async def cancel_plant_command(
     facility_id: _uuid.UUID,
     command_id: _uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("control:setpoint")),
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel a pending or pending_approval command before it reaches the edge agent."""
@@ -715,7 +715,7 @@ async def cancel_plant_command(
 async def approve_plant_command(
     facility_id: _uuid.UUID,
     command_id: _uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("control:setpoint")),
     db: AsyncSession = Depends(get_db),
 ):
     """Approve a pending_approval command, releasing it for execution by the edge agent."""

@@ -117,6 +117,59 @@ class TestAgentFacing:
         assert data["status"] == "ok"
         assert data["inserted"] == 2
 
+    async def test_telemetry_retry_is_idempotent(self, client: AsyncClient, agent: EdgeAgent, equipment):
+        """An agent that lost the response re-sends the same batch; the retry
+        must succeed with zero new rows, not fail on the primary key."""
+        payload = {
+            "readings": [
+                {
+                    "equipment_id": str(equipment.id),
+                    "time": "2026-07-09T10:00:00+00:00",
+                    "metric_name": "suction_pressure",
+                    "value": 28.5,
+                    "unit": "psi",
+                },
+            ]
+        }
+        first = await client.post(f"/api/v1/agents/{agent.agent_key}/telemetry", json=payload)
+        assert first.status_code == 200
+        assert first.json()["inserted"] == 1
+
+        retry = await client.post(f"/api/v1/agents/{agent.agent_key}/telemetry", json=payload)
+        assert retry.status_code == 200
+        assert retry.json()["inserted"] == 0
+
+    async def test_command_ack_rejects_bogus_state(self, client: AsyncClient, agent: EdgeAgent, facility: Facility):
+        """The ack endpoint must not let an agent write arbitrary strings into
+        the command state machine."""
+        from tests.conftest import TestSessionLocal
+        from app.models.control import CommandQueue
+
+        async with TestSessionLocal() as db:
+            cmd = CommandQueue(
+                id=uuid.uuid4(),
+                facility_id=facility.id,
+                agent_id=agent.id,
+                command_type="set_capacity",
+                parameters={"percent": 50},
+                state="sent",
+                source="user",
+            )
+            db.add(cmd)
+            await db.commit()
+
+        resp = await client.post(
+            f"/api/v1/agents/{agent.agent_key}/commands/{cmd.id}/ack",
+            json={"status": "pending_approval"},
+        )
+        assert resp.status_code == 400
+
+        resp = await client.post(
+            f"/api/v1/agents/{agent.agent_key}/commands/{cmd.id}/ack",
+            json={"status": "completed", "result": {"ok": True}},
+        )
+        assert resp.status_code == 200
+
     async def test_poll_commands_empty(self, client: AsyncClient, agent: EdgeAgent):
         resp = await client.get(f"/api/v1/agents/{agent.agent_key}/commands")
         assert resp.status_code == 200

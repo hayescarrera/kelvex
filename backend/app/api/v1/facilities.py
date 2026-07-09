@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from uuid import UUID
 
 from app.core.database import get_db
-from app.core.security import get_current_user, get_accessible_facility_ids, require_permission
+from app.core.security import get_current_user, get_accessible_facility_ids, require_permission, get_facility_scoped
 from app.models.user import User
 from app.models.facility import Facility
 from app.schemas.facility import (
@@ -86,16 +86,7 @@ async def get_facility(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a specific facility."""
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == current_user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
+    facility = await get_facility_scoped(facility_id, current_user, db)
     return facility
 
 
@@ -107,16 +98,7 @@ async def update_facility(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a facility."""
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == current_user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
+    facility = await get_facility_scoped(facility_id, current_user, db)
 
     update_data = data.model_dump(exclude_unset=True)
     old_vals = {k: getattr(facility, k) for k in update_data}
@@ -141,16 +123,7 @@ async def delete_facility(
     db: AsyncSession = Depends(get_db),
 ):
     """Soft-delete a facility. Requires facilities:delete permission."""
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == current_user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
+    facility = await get_facility_scoped(facility_id, current_user, db)
 
     facility.deleted_at = datetime.now(timezone.utc)
     await log_activity(db, user=current_user, action="delete", resource_type="facility",
@@ -167,16 +140,7 @@ async def get_floor_plan(
     db: AsyncSession = Depends(get_db),
 ):
     """Get the floor plan layout for a facility."""
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == current_user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
+    facility = await get_facility_scoped(facility_id, current_user, db)
     return {
         "facility_id": str(facility.id),
         "floor_plan": facility.floor_plan or {
@@ -194,16 +158,7 @@ async def save_floor_plan(
     db: AsyncSession = Depends(get_db),
 ):
     """Save floor plan layout for a facility."""
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == current_user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
+    facility = await get_facility_scoped(facility_id, current_user, db)
     facility.floor_plan = payload.get("floor_plan", payload)
     await db.commit()
     await db.refresh(facility)

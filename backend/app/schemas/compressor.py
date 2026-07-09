@@ -62,6 +62,7 @@ class CompressorUpdate(BaseModel):
     run_hours: Optional[int] = None
     next_maintenance_hours: Optional[int] = None
     rack_name: Optional[str] = None
+    portal_url: Optional[str] = None
     state: Optional[str] = None
     metadata: Optional[dict[str, Any]] = None
 
@@ -96,6 +97,7 @@ class CompressorResponse(BaseModel):
     health_score: Optional[float]
     last_reading_at: Optional[datetime]
     rack_name: Optional[str]
+    portal_url: Optional[str]
     created_at: datetime
     updated_at: datetime
 
@@ -179,6 +181,7 @@ class CompressorHealthSummary(BaseModel):
     refrigerant: str
     hp: Optional[float]
     rack_name: Optional[str]
+    portal_url: Optional[str] = None
     # Latest reading snapshot
     discharge_pressure_psi: Optional[float] = None
     suction_pressure_psi: Optional[float] = None

@@ -36,6 +36,10 @@ api_router.include_router(bills_router)
 api_router.include_router(equipment_router)
 api_router.include_router(savings_router)
 api_router.include_router(zones_router)
+# reports before alerts: /facilities/{id}/alerts/export (reports) must
+# register before /facilities/{id}/alerts/{alert_id} (alerts) or the literal
+# "export" segment gets parsed as an alert UUID and 422s.
+api_router.include_router(reports_router)
 api_router.include_router(alerts_router)
 api_router.include_router(controls_router)
 api_router.include_router(agents_router)
@@ -49,7 +53,6 @@ api_router.include_router(profiles_router)
 api_router.include_router(agent_devices_router)
 api_router.include_router(live_monitor_router)
 api_router.include_router(plant_control_router)
-api_router.include_router(reports_router)
 api_router.include_router(activity_router)
 api_router.include_router(events_router)
 api_router.include_router(compliance_router)

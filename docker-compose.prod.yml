@@ -16,6 +16,29 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Database backups (nightly pg_dump + retention + optional off-site) ───
+  backup:
+    image: timescale/timescaledb:latest-pg16
+    restart: always
+    environment:
+      PGHOST: db
+      PGUSER: kelvex
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: kelvex
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      # Set to an rclone remote (e.g. "b2:kelvex-backups/db") and mount an
+      # rclone.conf to enable off-site copies. Local-only until then.
+      BACKUP_RCLONE_REMOTE: ${BACKUP_RCLONE_REMOTE:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - backups:/backups
+      - ./backend/scripts:/scripts:ro
+      - ${RCLONE_CONFIG_PATH:-/dev/null}:/root/.config/rclone/rclone.conf:ro
+    entrypoint: ["sh", "/scripts/backup.sh"]
+
   # ── Redis ────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
@@ -50,9 +73,19 @@ services:
       # Tighten rate limits in prod
       AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-5}
       API_RATE_LIMIT_PER_MINUTE: ${API_RATE_LIMIT_PER_MINUTE:-100}
+      AGENT_RATE_LIMIT_PER_MINUTE: ${AGENT_RATE_LIMIT_PER_MINUTE:-600}
+      # Pool budget: 4 workers × (5+5) = 40 conns, under PG max_connections
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
       # Invite-only registration
       REGISTRATION_OPEN: "false"
       INVITE_SECRET: ${INVITE_SECRET}
+      # Email (alerts, invites, password resets)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-alerts@kelvex.io}
     depends_on:
       db:
         condition: service_healthy
@@ -77,6 +110,56 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # ── Celery worker + beat (leak detection & forecasting batches) ──────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kelvex:${POSTGRES_PASSWORD}@db:5432/kelvex
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      INVITE_SECRET: ${INVITE_SECRET}
+      # The worker sends the daily ops digest
+      OPS_ALERT_EMAIL: ${OPS_ALERT_EMAIL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-alerts@kelvex.io}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kelvex:${POSTGRES_PASSWORD}@db:5432/kelvex
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      INVITE_SECRET: ${INVITE_SECRET}
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app beat --loglevel=info
 
   # ── Frontend ─────────────────────────────────────────────────────────────
   frontend:
@@ -117,5 +200,6 @@ volumes:
   pg_data:
   redis_data:
   documents_data:
+  backups:
   certbot_www:
   certbot_conf:

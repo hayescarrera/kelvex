@@ -22,7 +22,7 @@ from sqlalchemy import select, func
 from uuid import UUID
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped, require_permission
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.billing import UtilityBill, DemandAnalysis
@@ -36,18 +36,8 @@ router = APIRouter(prefix="/facilities/{facility_id}/bills", tags=["bills"])
 
 
 # ── Helpers ──────────────────────────────────────
-async def _get_facility(facility_id: UUID, user: User, db: AsyncSession) -> Facility:
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return facility
+async def _get_facility(facility_id: UUID, user: User, db: AsyncSession):
+    return await get_facility_scoped(facility_id, user, db)
 
 
 async def _get_bill(bill_id: UUID, facility_id: UUID, db: AsyncSession) -> UtilityBill:
@@ -162,7 +152,7 @@ def parse_bill_csv(content: str) -> list[dict]:
 async def create_bill(
     facility_id: UUID,
     data: BillCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("bills:manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Manually create a utility bill."""
@@ -188,7 +178,7 @@ async def create_bill(
 async def upload_bills(
     facility_id: UUID,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("bills:manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload a CSV of utility bills. Returns all created bills."""
@@ -292,7 +282,7 @@ async def get_bill(
 async def delete_bill(
     facility_id: UUID,
     bill_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("bills:manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a bill."""
@@ -306,7 +296,7 @@ async def delete_bill(
 async def analyze_bill(
     facility_id: UUID,
     bill_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("bills:manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Run demand charge analysis on a single bill."""

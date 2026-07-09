@@ -41,9 +41,9 @@ if settings.SENTRY_DSN:
 _engine_status: dict[str, str] = {}  # engine_name → "running" | "failed" | "skipped"
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Startup/shutdown lifecycle — start polling engine, seed data."""
+async def _start_all_engines():
+    """Start every background engine. Runs only on the elected leader worker
+    so multi-worker deployments don't duplicate polls, digests, and rules."""
     import logging
     logger = logging.getLogger("kelvex")
 
@@ -102,6 +102,26 @@ async def lifespan(app: FastAPI):
         _engine_status["compressor_health"] = "failed"
         logger.warning(f"Compressor health engine startup skipped: {e}")
 
+    # Start agent connectivity monitor
+    try:
+        from app.core.database import async_session
+        from app.services.agent_monitor import start_agent_monitor
+        await start_agent_monitor(async_session)
+        _engine_status["agent_monitor"] = "running"
+        logger.info("Agent monitor started")
+    except Exception as e:
+        _engine_status["agent_monitor"] = "failed"
+        logger.warning(f"Agent monitor startup skipped: {e}")
+
+    try:
+        from app.services.energy_analytics import start_energy_analytics_engine
+        await start_energy_analytics_engine()
+        _engine_status["energy_analytics"] = "running"
+        logger.info("Energy analytics engine started")
+    except Exception as e:
+        _engine_status["energy_analytics"] = "failed"
+        logger.warning(f"Energy analytics engine startup skipped: {e}")
+
     # Seed register maps and device profiles on first run
     try:
         from app.core.database import async_session
@@ -124,9 +144,30 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Demo data seeding skipped: {e}")
 
+
+_engine_leader = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup/shutdown lifecycle — elect an engine leader, run engines there."""
+    global _engine_leader
+    from app.core.leader import EngineLeader
+
+    if settings.REDIS_URL:
+        _engine_leader = EngineLeader(settings.REDIS_URL, on_elected=_start_all_engines)
+        await _engine_leader.start()
+    else:
+        await _start_all_engines()
+
     yield
 
     # Shutdown
+    if _engine_leader:
+        try:
+            await _engine_leader.stop()
+        except Exception:
+            pass
     try:
         from app.services.polling_engine import stop_polling_engine
         await stop_polling_engine()
@@ -145,6 +186,16 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.compressor_health import stop_compressor_health_engine
         await stop_compressor_health_engine()
+    except Exception:
+        pass
+    try:
+        from app.services.agent_monitor import stop_agent_monitor
+        await stop_agent_monitor()
+    except Exception:
+        pass
+    try:
+        from app.services.energy_analytics import stop_energy_analytics_engine
+        await stop_energy_analytics_engine()
     except Exception:
         pass
     if auth_rate_limiter:
@@ -246,7 +297,12 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-_AUTH_RATE_LIMITED_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register"}
+_AUTH_RATE_LIMITED_PATHS = {
+    "/api/v1/auth/login",
+    "/api/v1/auth/register",
+    "/api/v1/auth/password-reset/request",
+    "/api/v1/auth/password-reset/confirm",
+}
 
 
 @app.middleware("http")
@@ -292,15 +348,43 @@ def _extract_rate_limit_subject(request: Request) -> str:
     return f"ip:{client_ip}"
 
 
+def _agent_key_from_request(request: Request) -> str | None:
+    """Return the agent key for agent-facing routes.
+
+    Legacy routes carry it in the path (/api/v1/agents/{cg_...}/...);
+    v2 routes (/api/v1/agent/...) carry it as a Bearer token.
+    """
+    path = request.url.path
+    prefix = "/api/v1/agents/"
+    if path.startswith(prefix):
+        # Cloud-facing agent management lives under /facilities/...; agent-
+        # facing routes are exactly /agents/{key}/<action>, keys start "cg_".
+        key = path[len(prefix):].split("/", 1)[0]
+        return key if key.startswith("cg_") else None
+    if path.startswith("/api/v1/agent/"):
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer cg_"):
+            return auth[7:].strip()
+    return None
+
+
 @app.middleware("http")
 async def api_rate_limit(request: Request, call_next):
     """Apply general API rate limit to authenticated traffic."""
     if request.url.path.startswith("/api/v1/") and not request.url.path.startswith("/api/v1/auth/") and api_rate_limiter:
-        subject = _extract_rate_limit_subject(request)
+        agent_key = _agent_key_from_request(request)
+        if agent_key:
+            # Per-agent bucket, higher ceiling: outage back-fills are bursty
+            # and several agents can share one site IP.
+            subject = f"agent:{agent_key}"
+            limit = settings.AGENT_RATE_LIMIT_PER_MINUTE
+        else:
+            subject = _extract_rate_limit_subject(request)
+            limit = settings.API_RATE_LIMIT_PER_MINUTE
         bucket_key = f"rl:api:{subject}"
         result = await api_rate_limiter.check(
             bucket_key=bucket_key,
-            limit=settings.API_RATE_LIMIT_PER_MINUTE,
+            limit=limit,
             window_seconds=60,
         )
         if not result.allowed:
@@ -313,7 +397,7 @@ async def api_rate_limit(request: Request, call_next):
                 },
                 headers={
                     "Retry-After": str(result.retry_after_seconds),
-                    "X-RateLimit-Limit": str(settings.API_RATE_LIMIT_PER_MINUTE),
+                    "X-RateLimit-Limit": str(limit),
                     "X-RateLimit-Remaining": str(result.remaining),
                 },
             )
@@ -367,6 +451,11 @@ async def health_check():
     status_text = "healthy" if is_healthy else "degraded"
     status_code = 200 if is_healthy or not settings.HEALTHCHECK_STRICT else 503
 
+    if _engine_leader and not _engine_leader.is_leader:
+        engines_view = "standby (engines run on the leader worker)"
+    else:
+        engines_view = _engine_status if _engine_status else "starting"
+
     return JSONResponse(
         status_code=status_code,
         content={
@@ -375,7 +464,7 @@ async def health_check():
             "checks": {
                 "database": "healthy" if db_ok else "unhealthy",
                 "redis": "healthy" if redis_ok else "unhealthy",
-                "engines": _engine_status if _engine_status else "starting",
+                "engines": engines_view,
             },
             **({"engines_failed": engines_failed} if engines_failed else {}),
         },

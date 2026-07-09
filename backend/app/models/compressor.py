@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
     String, Float, Integer, Boolean, DateTime, ForeignKey, Text,
-    Index,
+    Index, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -74,6 +74,7 @@ class Compressor(Base):
 
     # Rack assignment
     rack_name: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "Engine Room 1"
+    portal_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # OEM cloud portal (e.g. Copeland Connected, Danfoss Alsense)
 
     # Flexible metadata
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True, default=dict)
@@ -155,4 +156,7 @@ class CompressorReading(Base):
     __table_args__ = (
         Index("ix_reading_compressor_time", "compressor_id", "recorded_at"),
         Index("ix_reading_recorded_at", "recorded_at"),
+        # Idempotency: edge agents retry batches after network failures —
+        # one reading per compressor per timestamp, duplicates dropped on insert
+        UniqueConstraint("compressor_id", "recorded_at", name="uq_reading_compressor_recorded_at"),
     )

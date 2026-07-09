@@ -11,6 +11,7 @@ class EquipmentCreate(BaseModel):
     model: Optional[str] = None
     controller_type: Optional[str] = None  # copeland, danfoss, allen_bradley
     protocol: Optional[str] = None  # bacnet, modbus, ethernet_ip
+    portal_url: Optional[str] = None
 
 
 class EquipmentUpdate(BaseModel):
@@ -20,6 +21,7 @@ class EquipmentUpdate(BaseModel):
     model: Optional[str] = None
     controller_type: Optional[str] = None
     protocol: Optional[str] = None
+    portal_url: Optional[str] = None
 
 
 class EquipmentResponse(BaseModel):
@@ -31,6 +33,7 @@ class EquipmentResponse(BaseModel):
     model: Optional[str]
     controller_type: Optional[str]
     protocol: Optional[str]
+    portal_url: Optional[str]
     commissioned_at: Optional[datetime]
     created_at: datetime
 

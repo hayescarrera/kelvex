@@ -22,6 +22,7 @@ class EdgeAgentUpdate(BaseModel):
     protocols_config: dict | None = None
     capabilities: dict | None = None
     enabled: bool | None = None
+    controller_url: str | None = None
 
 
 class EdgeAgentResponse(BaseModel):
@@ -52,6 +53,7 @@ class EdgeAgentResponse(BaseModel):
     pending_commands: int
     registered_at: datetime
     last_config_push: datetime | None = None
+    controller_url: str | None = None
 
 
 class EdgeAgentListResponse(BaseModel):

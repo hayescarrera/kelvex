@@ -32,7 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped, require_permission
 from app.core.crypto import decrypt_json, encrypt_json
 from app.models.user import User
 from app.models.facility import Facility
@@ -53,18 +53,8 @@ router = APIRouter(tags=["integrations"])
 
 # ── Helpers ─────────────────────────────────────────────
 
-async def _get_facility(facility_id: UUID, user: User, db: AsyncSession) -> Facility:
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return facility
+async def _get_facility(facility_id: UUID, user: User, db: AsyncSession):
+    return await get_facility_scoped(facility_id, user, db)
 
 
 async def _get_integration(
@@ -128,7 +118,7 @@ async def get_providers(user: User = Depends(get_current_user)):
 async def create_integration(
     facility_id: UUID,
     payload: IntegrationCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("agents:manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new integration for a facility."""
@@ -472,7 +462,7 @@ async def trigger_poll(
 async def create_credential(
     facility_id: UUID,
     payload: CredentialCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("agents:manage")),
     db: AsyncSession = Depends(get_db),
 ):
     """Store encrypted credentials for a provider."""
@@ -586,7 +576,7 @@ async def get_register_map(
 )
 async def create_register_map(
     payload: RegisterMapCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("kelvex:provision")),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a register map (typically admin/installer only)."""

@@ -135,7 +135,10 @@ async def event_stream(token: str = Query(..., description="JWT access token")):
 
 @router.get("/subscribers")
 async def subscriber_count(
-    current_user: User = Depends(require_permission("admin:read")),
+    # "admin:read" was never defined in the PERMISSIONS matrix, so this
+    # endpoint rejected everyone. audit:view (kelvex_admin/owner/admin) is
+    # the intended audience for a debug endpoint.
+    current_user: User = Depends(require_permission("audit:view")),
 ):
     """Admin debug endpoint: show connected SSE subscriber counts."""
     return {

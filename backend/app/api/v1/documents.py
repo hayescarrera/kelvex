@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped, require_permission
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.document import Document
@@ -51,18 +51,8 @@ def _doc_to_dict(doc: Document) -> dict:
     }
 
 
-async def _verify_facility(facility_id: UUID, user: User, db: AsyncSession) -> Facility:
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    fac = result.scalar_one_or_none()
-    if not fac:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return fac
+async def _verify_facility(facility_id: UUID, user: User, db: AsyncSession):
+    return await get_facility_scoped(facility_id, user, db)
 
 
 @router.get("")
@@ -94,7 +84,7 @@ async def upload_document(
     name: str = Form(""),
     facility_id: UUID | None = Form(None),
     equipment_id: UUID | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("documents:manage")),
     db: AsyncSession = Depends(get_db),
 ):
     if document_type not in ALLOWED_TYPES:
@@ -150,7 +140,7 @@ async def upload_document(
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("documents:manage")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(

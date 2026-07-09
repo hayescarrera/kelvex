@@ -255,22 +255,26 @@ class TestIngestToHealthPipeline:
         self, client: AsyncClient, agent, compressor: Compressor
     ):
         """POST compressor readings via HTTP API, then verify health score computes."""
+        base_time = datetime.now(timezone.utc) - timedelta(minutes=50)
         readings_payload = [
             {
                 "compressor_id": str(compressor.id),
-                "discharge_pressure_psi": 180.0,
-                "suction_pressure_psi": 28.5,
-                "discharge_temp_f": 184.0,
-                "oil_temp_f": 148.0,
-                "bearing_temp_f": 157.0,
-                "vibration_ips": 0.13,
-                "amp_draw": 225.0,
-                "kw": 186.0,
-                "slide_valve_pct": 78.0,
-                "rpm": 3560,
-                "running": True,
+                "time": (base_time + timedelta(minutes=5 * i)).isoformat(),
+                "values": {
+                    "discharge_pressure_psi": 180.0,
+                    "suction_pressure_psi": 28.5,
+                    "discharge_temp_f": 184.0,
+                    "oil_temp_f": 148.0,
+                    "bearing_temp_f": 157.0,
+                    "vibration_ips": 0.13,
+                    "amp_draw": 225.0,
+                    "kw": 186.0,
+                    "slide_valve_pct": 78.0,
+                    "rpm": 3560,
+                    "running": True,
+                },
             }
-            for _ in range(10)
+            for i in range(10)
         ]
 
         resp = await client.post(
@@ -281,7 +285,22 @@ class TestIngestToHealthPipeline:
         data = resp.json()
         assert data["inserted"] == 10
 
+        # Retrying the same batch (agent lost the response) must be a no-op —
+        # no error, no duplicate rows.
+        resp = await client.post(
+            f"/api/v1/agents/{agent.agent_key}/compressor-readings",
+            json={"readings": readings_payload},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["inserted"] == 0
+
         async with TestSessionLocal() as db:
+            count_result = await db.execute(
+                select(CompressorReading).where(
+                    CompressorReading.compressor_id == compressor.id
+                )
+            )
+            assert len(count_result.scalars().all()) == 10
             score, anomalies = await compute_health_score(compressor.id, db)
 
         assert score is not None

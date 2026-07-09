@@ -27,6 +27,41 @@ services:
     volumes:
       - documents_data:/data/documents
 
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: coldgrid-worker
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-coldgrid}:${POSTGRES_PASSWORD:-coldgrid_dev}@db:5432/${POSTGRES_DB:-coldgrid}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - CREDENTIAL_ENCRYPTION_KEY=${CREDENTIAL_ENCRYPTION_KEY:-}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    restart: unless-stopped
+
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: coldgrid-beat
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-coldgrid}:${POSTGRES_PASSWORD:-coldgrid_dev}@db:5432/${POSTGRES_DB:-coldgrid}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app beat --loglevel=info
+    restart: unless-stopped
+
   db:
     image: timescale/timescaledb:latest-pg16
     container_name: coldgrid-db
@@ -44,6 +79,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  backup:
+    image: timescale/timescaledb:latest-pg16
+    container_name: coldgrid-backup
+    environment:
+      - PGHOST=db
+      - PGUSER=${POSTGRES_USER:-coldgrid}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-coldgrid_dev}
+      - PGDATABASE=${POSTGRES_DB:-coldgrid}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-14}
+      - BACKUP_INTERVAL_SECONDS=${BACKUP_INTERVAL_SECONDS:-86400}
+      - BACKUP_RCLONE_REMOTE=${BACKUP_RCLONE_REMOTE:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - backups:/backups
+      - ./backend/scripts:/scripts:ro
+    entrypoint: ["sh", "/scripts/backup.sh"]
     restart: unless-stopped
 
   redis:
@@ -73,3 +128,4 @@ services:
 volumes:
   pgdata:
   documents_data:
+  backups:

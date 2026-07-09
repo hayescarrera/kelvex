@@ -97,6 +97,7 @@ class Equipment(Base):
     protocol: Mapped[str] = mapped_column(
         String(50), nullable=True
     )  # bacnet, modbus, ethernet_ip
+    portal_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # cloud platform URL (e.g. Copeland Connected, Danfoss Alsense)
 
     # Refrigerant tracking — required for AIM Act leak-rate thresholds
     refrigerant_type: Mapped[str | None] = mapped_column(String(50), nullable=True)

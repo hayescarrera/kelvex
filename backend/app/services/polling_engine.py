@@ -27,6 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from app.core.crypto import decrypt_json
 from app.models.integration import Integration, IntegrationCredential
 from app.models.telemetry import Telemetry
+from app.models.zone import Zone
+from app.models.zone_sensor import ZoneReading
 from app.integrations.adapters import get_adapter_class
 
 logger = logging.getLogger("coldgrid.polling_engine")
@@ -181,25 +183,57 @@ class PollingEngine:
 
                 # Ingest readings into TimescaleDB
                 ingested = 0
+                zone_ids_updated: set = set()
                 for reading in readings:
                     try:
-                        telemetry = Telemetry(
+                        db.add(Telemetry(
                             equipment_id=reading.equipment_id,
                             metric_name=reading.metric_name,
                             value=reading.value,
                             unit=reading.unit,
                             recorded_at=reading.timestamp or now,
                             quality=reading.quality,
-                        )
-                        db.add(telemetry)
+                        ))
                         ingested += 1
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to create telemetry record: {e}"
-                        )
 
+                        # Zone temp readings: also write ZoneReading + update Zone
+                        if reading.zone_id is not None:
+                            db.add(ZoneReading(
+                                sensor_id=reading.sensor_id,
+                                zone_id=reading.zone_id,
+                                value=reading.value,
+                                unit=reading.unit,
+                                quality=reading.quality,
+                                recorded_at=reading.timestamp or now,
+                            ))
+                            zone_ids_updated.add(reading.zone_id)
+
+                    except Exception as e:
+                        logger.warning(f"Failed to create telemetry record: {e}")
+
+                # Flush first so zone reads see the latest sensor values
                 if ingested > 0:
                     await db.flush()
+
+                # Update Zone.current_temp for any zone that received new data
+                for zone_id in zone_ids_updated:
+                    result = await db.execute(
+                        select(Zone).where(Zone.id == zone_id)
+                    )
+                    zone = result.scalar_one_or_none()
+                    if zone:
+                        # Find the last reading for this zone from the batch
+                        last = max(
+                            (r for r in readings if r.zone_id == zone_id),
+                            key=lambda r: r.timestamp or now,
+                        )
+                        if last.metric_name in ("zone_temp", "temperature", "air_temp", "air_off_temp"):
+                            zone.current_temp = last.value
+                            zone.last_reading_at = last.timestamp or now
+                            if last.quality == 2:
+                                zone.state = "offline"
+                        elif last.metric_name in ("zone_humidity", "humidity"):
+                            zone.current_humidity = last.value
 
                 # Update integration stats
                 await db.execute(

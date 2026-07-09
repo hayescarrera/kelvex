@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped, get_accessible_facility_ids
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.alert import Alert, Event
@@ -31,18 +31,8 @@ from app.services.alert_dispatch import dispatch_alert_notifications, cancel_esc
 router = APIRouter(tags=["alerts"])
 
 
-async def _get_facility(facility_id: UUID, user: User, db: AsyncSession) -> Facility:
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return facility
+async def _get_facility(facility_id: UUID, user: User, db: AsyncSession):
+    return await get_facility_scoped(facility_id, user, db)
 
 
 # ── Alerts ─────────────────────────────────────────
@@ -185,12 +175,16 @@ async def alert_summary(
     db: AsyncSession = Depends(get_db),
 ):
     """Get active alert counts grouped by severity across all user's facilities."""
-    result = await db.execute(
+    q = (
         select(Alert.severity, func.count(Alert.id))
         .join(Facility, Alert.facility_id == Facility.id)
         .where(Facility.org_id == current_user.org_id, Alert.state == "active")
         .group_by(Alert.severity)
     )
+    accessible = await get_accessible_facility_ids(current_user, db)
+    if accessible is not None:
+        q = q.where(Alert.facility_id.in_(accessible))
+    result = await db.execute(q)
     counts = {row[0]: row[1] for row in result.all()}
     total = sum(counts.values())
     return {
@@ -228,6 +222,10 @@ async def list_all_alerts(
         .join(Facility, Alert.facility_id == Facility.id)
         .where(Facility.org_id == current_user.org_id)
     )
+    accessible = await get_accessible_facility_ids(current_user, db)
+    if accessible is not None:
+        query = query.where(Alert.facility_id.in_(accessible))
+        count_query = count_query.where(Alert.facility_id.in_(accessible))
 
     if state:
         query = query.where(Alert.state == state)

@@ -29,6 +29,7 @@ from app.models.maintenance_event import MaintenanceEvent
 from app.models.leak_rate import LeakRateRecord
 from app.models.notification_policy import NotificationPolicy
 from app.models.invite_token import InviteToken
+from app.models.energy import EnergySystemConfig, EnergyOpportunity, SavingsVerification
 
 __all__ = [
     "User",

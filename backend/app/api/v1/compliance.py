@@ -31,7 +31,7 @@ from sqlalchemy import select, func, and_
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.compliance import (
@@ -103,18 +103,8 @@ class ReportSignOff(BaseModel):
 
 # ── Helpers ──────────────────────────────────────
 
-async def _verify_facility(facility_id: UUID, user: User, db: AsyncSession) -> Facility:
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    fac = result.scalar_one_or_none()
-    if not fac:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return fac
+async def _verify_facility(facility_id: UUID, user: User, db: AsyncSession):
+    return await get_facility_scoped(facility_id, user, db)
 
 
 def _ccp_to_dict(ccp: CriticalControlPoint) -> dict:

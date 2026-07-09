@@ -20,7 +20,7 @@ from sqlalchemy import select, func
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_permission, get_facility_scoped
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.compliance import MaintenanceTask
@@ -67,15 +67,7 @@ class TaskUpdate(BaseModel):
 # ── Helpers ──────────────────────────────────────
 
 async def _verify_facility(facility_id: UUID, user: User, db: AsyncSession):
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Facility not found")
+    await get_facility_scoped(facility_id, user, db)
 
 
 def _task_to_dict(t: MaintenanceTask) -> dict:
@@ -111,7 +103,7 @@ def _task_to_dict(t: MaintenanceTask) -> dict:
 @router.post("/tasks", status_code=status.HTTP_201_CREATED)
 async def create_task(
     data: TaskCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("maintenance:log")),
     db: AsyncSession = Depends(get_db),
 ):
     await _verify_facility(data.facility_id, current_user, db)
@@ -188,7 +180,7 @@ async def get_task(
 async def update_task(
     task_id: UUID,
     data: TaskUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("maintenance:log")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -242,7 +234,7 @@ async def update_task(
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def cancel_task(
     task_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("maintenance:log")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -266,7 +258,7 @@ _SEVERITY_TO_PRIORITY = {"critical": "critical", "high": "high", "medium": "medi
 @router.post("/tasks/from-alert", status_code=status.HTTP_201_CREATED)
 async def create_task_from_alert(
     body: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("maintenance:log")),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -338,7 +330,7 @@ async def create_task_from_alert(
 @router.post("/tasks/from-leak-event", status_code=status.HTTP_201_CREATED)
 async def create_task_from_leak_event(
     body: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("maintenance:log")),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -539,7 +531,7 @@ async def list_maintenance_events(
 @router.post("/events", status_code=status.HTTP_201_CREATED)
 async def create_maintenance_event(
     data: MaintenanceEventCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("maintenance:log")),
     db: AsyncSession = Depends(get_db),
 ):
     if data.event_type not in VALID_EVENT_TYPES:
@@ -547,15 +539,7 @@ async def create_maintenance_event(
             status_code=422,
             detail=f"Invalid event_type. Allowed: {sorted(VALID_EVENT_TYPES)}",
         )
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == data.facility_id,
-            Facility.org_id == current_user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Facility not found")
+    await get_facility_scoped(data.facility_id, current_user, db)
 
     event = MaintenanceEvent(
         org_id=current_user.org_id,

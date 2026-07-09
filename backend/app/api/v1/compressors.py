@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.compressor import Compressor, CompressorReading
@@ -34,18 +34,8 @@ from app.schemas.compressor import (
 router = APIRouter(prefix="/facilities/{facility_id}/compressors", tags=["compressors"])
 
 
-async def _get_facility(facility_id: UUID, user: User, db: AsyncSession) -> Facility:
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return facility
+async def _get_facility(facility_id: UUID, user: User, db: AsyncSession):
+    return await get_facility_scoped(facility_id, user, db)
 
 
 async def _get_compressor(compressor_id: UUID, facility_id: UUID, db: AsyncSession) -> Compressor:
@@ -158,6 +148,7 @@ async def compressor_summary(
             slide_valve_pct=latest.slide_valve_pct if latest else None,
             running=latest.running if latest else None,
             last_reading_at=comp.last_reading_at,
+            portal_url=comp.portal_url,
             anomalies=anomalies,
         )
         summaries.append(summary)

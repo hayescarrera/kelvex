@@ -12,7 +12,7 @@ from uuid import UUID
 from decimal import Decimal
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.billing import UtilityBill
@@ -30,15 +30,7 @@ async def simulate_savings(
 ):
     """Simulate savings scenarios using the facility's bill history."""
     # Verify facility ownership
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == current_user.org_id,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
+    facility = await get_facility_scoped(facility_id, current_user, db)
 
     # Get bills
     bills_result = await db.execute(
@@ -138,15 +130,7 @@ async def savings_report(
         market rate. R-404A spot ~$12/lb, R-448A ~$18/lb (2024 market rates).
     """
     # Verify facility
-    fac_result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == current_user.org_id,
-        )
-    )
-    facility = fac_result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
+    facility = await get_facility_scoped(facility_id, current_user, db)
 
     now = datetime.now(timezone.utc)
     year_ago = now - timedelta(days=365)

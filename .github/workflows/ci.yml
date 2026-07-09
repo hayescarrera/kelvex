@@ -62,6 +62,8 @@ jobs:
     needs: [backend, frontend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # No continue-on-error here: a failed deploy must show red, not a green
+    # check over a stale production.
     steps:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3

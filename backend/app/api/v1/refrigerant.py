@@ -31,7 +31,7 @@ from sqlalchemy import select, func, and_
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped, require_permission, get_accessible_facility_ids
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.refrigerant import (
@@ -166,18 +166,8 @@ async def _fetch_rack_telemetry(
     return racks_by_id, comps_by_rack_name
 
 
-async def _verify_facility(facility_id: UUID, user: User, db: AsyncSession) -> Facility:
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    fac = result.scalar_one_or_none()
-    if not fac:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return fac
+async def _verify_facility(facility_id: UUID, user: User, db: AsyncSession):
+    return await get_facility_scoped(facility_id, user, db)
 
 
 def _circuit_to_dict(
@@ -273,7 +263,7 @@ def _repair_to_dict(r: RepairRecord) -> dict:
 @router.post("/circuits", status_code=status.HTTP_201_CREATED)
 async def create_circuit(
     data: CircuitCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("refrigerant:log")),
     db: AsyncSession = Depends(get_db),
 ):
     await _verify_facility(data.facility_id, current_user, db)
@@ -352,7 +342,7 @@ async def list_circuits(
 async def update_circuit(
     circuit_id: UUID,
     data: CircuitUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("refrigerant:log")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -375,7 +365,7 @@ async def update_circuit(
 @router.delete("/circuits/{circuit_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def deactivate_circuit(
     circuit_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("refrigerant:log")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -396,7 +386,7 @@ async def deactivate_circuit(
 @router.post("/leak-events", status_code=status.HTTP_201_CREATED)
 async def create_leak_event(
     data: LeakEventCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("refrigerant:log")),
     db: AsyncSession = Depends(get_db),
 ):
     await _verify_facility(data.facility_id, current_user, db)
@@ -455,7 +445,7 @@ async def get_leak_event(
 async def update_leak_event(
     event_id: UUID,
     data: LeakEventUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("refrigerant:log")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -480,7 +470,7 @@ async def update_leak_event(
 @router.post("/adds", status_code=status.HTTP_201_CREATED)
 async def create_refrigerant_add(
     data: RefrigerantAddCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("refrigerant:log")),
     db: AsyncSession = Depends(get_db),
 ):
     await _verify_facility(data.facility_id, current_user, db)
@@ -521,7 +511,7 @@ async def list_refrigerant_adds(
 @router.post("/repairs", status_code=status.HTTP_201_CREATED)
 async def create_repair_record(
     data: RepairRecordCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("refrigerant:log")),
     db: AsyncSession = Depends(get_db),
 ):
     await _verify_facility(data.facility_id, current_user, db)
@@ -560,7 +550,7 @@ async def list_repair_records(
 @router.post("/repairs/{repair_id}/detect-callback")
 async def detect_callback(
     repair_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("refrigerant:log")),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -683,6 +673,9 @@ async def refrigerant_dashboard(
         Facility.org_id == current_user.org_id,
         Facility.deleted_at == None,
     )
+    accessible = await get_accessible_facility_ids(current_user, db)
+    if accessible is not None:
+        facilities_q = facilities_q.where(Facility.id.in_(accessible))
     if facility_id:
         facilities_q = facilities_q.where(Facility.id == facility_id)
     fac_result = await db.execute(facilities_q)

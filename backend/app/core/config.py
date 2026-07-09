@@ -14,11 +14,19 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://coldgrid:coldgrid_dev@db:5432/coldgrid"
     # Sync URL for Alembic migrations
     DATABASE_URL_SYNC: str = "postgresql://coldgrid:coldgrid_dev@db:5432/coldgrid"
+    # Per-process pool. Budget: workers × (POOL_SIZE + MAX_OVERFLOW) + celery
+    # must stay under Postgres max_connections (default 100).
+    # 4 gunicorn workers × (5+5) = 40, leaving room for celery + psql.
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
 
     # Redis
     REDIS_URL: str = "redis://redis:6379/0"
     AUTH_RATE_LIMIT_PER_MINUTE: int = 30
     API_RATE_LIMIT_PER_MINUTE: int = 100
+    # Edge agents burst far above human traffic when back-filling buffered
+    # readings after an outage; throttling that recovery wedges the pipeline.
+    AGENT_RATE_LIMIT_PER_MINUTE: int = 600
 
     # Auth
     SECRET_KEY: str = "dev-secret-key-change-in-production"
@@ -58,6 +66,10 @@ class Settings(BaseSettings):
 
     # Health checks
     HEALTHCHECK_STRICT: bool = False
+
+    # Internal ops digest — daily fleet-health email to the Kelvex operator.
+    # Empty disables it.
+    OPS_ALERT_EMAIL: str = ""
 
     # File uploads
     MAX_UPLOAD_SIZE_MB: int = 50

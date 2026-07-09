@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_accessible_facility_ids
 from app.models.user import User
 from app.models.facility import Facility
 from app.models.compressor import Compressor, CompressorReading
@@ -39,12 +39,14 @@ async def org_wide_live(
     Designed to be polled every 5-10 seconds by the frontend.
     """
     # Get all org facilities
-    fac_result = await db.execute(
-        select(Facility).where(
-            Facility.org_id == current_user.org_id,
-            Facility.deleted_at == None,
-        ).order_by(Facility.name)
-    )
+    fac_query = select(Facility).where(
+        Facility.org_id == current_user.org_id,
+        Facility.deleted_at == None,
+    ).order_by(Facility.name)
+    accessible = await get_accessible_facility_ids(current_user, db)
+    if accessible is not None:
+        fac_query = fac_query.where(Facility.id.in_(accessible))
+    fac_result = await db.execute(fac_query)
     facilities = list(fac_result.scalars().all())
 
     # Aggregates

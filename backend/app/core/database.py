@@ -6,7 +6,13 @@ settings = get_settings()
 
 _engine_kwargs = dict(echo=settings.DEBUG)
 if "sqlite" not in settings.DATABASE_URL:
-    _engine_kwargs.update(pool_size=20, max_overflow=10, pool_pre_ping=True)
+    _engine_kwargs.update(
+        pool_size=settings.DB_POOL_SIZE,
+        max_overflow=settings.DB_MAX_OVERFLOW,
+        pool_pre_ping=True,
+        # Don't hold idle connections forever; recycle before server timeouts
+        pool_recycle=1800,
+    )
 
 engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
 

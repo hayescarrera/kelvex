@@ -790,8 +790,12 @@ async def request_password_reset(
 
     reset_token = str(uuid.uuid4())
     redis = await get_redis()
-    if redis:
-        await redis.setex(f"pwreset:{reset_token}", _RESET_TTL, str(user.id))
+    if not redis:
+        # Token can't be stored, so any link we email would be dead.
+        # Return the generic message (no enumeration) but skip sending.
+        logger.error("Password reset requested but Redis is unavailable; no email sent to %s", email)
+        return {"message": "If that email exists you will receive a reset link."}
+    await redis.setex(f"pwreset:{reset_token}", _RESET_TTL, str(user.id))
 
     frontend_url = getattr(settings, "FRONTEND_URL", "https://app.kelvex.io")
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"

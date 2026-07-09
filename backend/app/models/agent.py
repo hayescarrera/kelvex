@@ -41,6 +41,7 @@ class EdgeAgent(Base):
     hostname: Mapped[str] = mapped_column(String(255), nullable=True)
     ip_address: Mapped[str] = mapped_column(String(45), nullable=True)  # supports IPv6
     mac_address: Mapped[str] = mapped_column(String(17), nullable=True)
+    controller_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # local controller web UI (e.g. http://192.168.1.50)
     # Connectivity
     connection_state: Mapped[str] = mapped_column(
         String(20), default="disconnected"

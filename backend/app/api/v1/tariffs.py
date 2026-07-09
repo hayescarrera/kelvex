@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_facility_scoped
 from app.models.user import User
 from app.models.tariff import Utility, RateSchedule
 from app.models.facility import Facility
@@ -198,16 +198,7 @@ async def assign_rate_schedule(
     db: AsyncSession = Depends(get_db),
 ):
     """Assign a rate schedule to a facility."""
-    result = await db.execute(
-        select(Facility).where(
-            Facility.id == facility_id,
-            Facility.org_id == current_user.org_id,
-            Facility.deleted_at == None,
-        )
-    )
-    facility = result.scalar_one_or_none()
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
+    facility = await get_facility_scoped(facility_id, current_user, db)
 
     result = await db.execute(select(RateSchedule).where(RateSchedule.id == schedule_id))
     if not result.scalar_one_or_none():

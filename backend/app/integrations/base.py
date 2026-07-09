@@ -27,6 +27,11 @@ class TelemetryReading:
     unit: str               # e.g. 'degF', 'psi', 'kW', 'percent'
     timestamp: datetime
     quality: int = 0        # 0=good, 1=estimated, 2=suspect, 3=missing
+    # Optional: set when this reading represents a zone sensor measurement.
+    # The polling engine writes a ZoneReading and updates Zone.current_temp
+    # in addition to the normal Telemetry record.
+    zone_id: UUID | None = None
+    sensor_id: UUID | None = None
 
 
 @dataclass

@@ -119,10 +119,41 @@ class TestIntegrationCRUD:
 
 
 class TestRegisterMaps:
-    async def test_create_register_map(self, client: AsyncClient, auth_headers: dict):
+    async def test_create_register_map_requires_kelvex_admin(
+        self, client: AsyncClient, auth_headers: dict
+    ):
+        """Register maps are global reference data shared across all tenants —
+        org owners must not be able to create or modify them."""
         resp = await client.post(
             "/api/v1/register-maps",
             headers=auth_headers,
+            json={"name": "nope", "protocol": "modbus_tcp", "registers": {}},
+        )
+        assert resp.status_code == 403
+
+    async def test_create_register_map(self, client: AsyncClient, user):
+        from tests.conftest import TestSessionLocal
+        from app.core.security import get_password_hash, create_access_token
+        from app.models.user import User
+
+        async with TestSessionLocal() as db:
+            admin = User(
+                id=uuid.uuid4(),
+                email="staff@kelvex.io",
+                hashed_password=get_password_hash("TestPass123!"),
+                full_name="Kelvex Staff",
+                org_id=user.org_id,
+                role="kelvex_admin",
+                is_active=True,
+            )
+            db.add(admin)
+            await db.commit()
+            await db.refresh(admin)
+        token = create_access_token(data={"sub": str(admin.id), "org": str(admin.org_id)})
+
+        resp = await client.post(
+            "/api/v1/register-maps",
+            headers={"Authorization": f"Bearer {token}"},
             json={
                 "name": "test_custom_map",
                 "protocol": "modbus_tcp",

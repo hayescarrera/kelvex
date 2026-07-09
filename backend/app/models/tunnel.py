@@ -56,6 +56,7 @@ class TunnelSession(Base):
 
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    controller_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # copied from agent at session start
 
     def __repr__(self):
         return f"<TunnelSession user={self.user_email} agent={self.agent_id} started={self.started_at}>"
