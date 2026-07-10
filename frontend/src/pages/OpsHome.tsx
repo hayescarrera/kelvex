@@ -7,24 +7,15 @@ import PageHeader from '../components/ui/PageHeader'
 import StatCard from '../components/ui/StatCard'
 import LoadingState from '../components/ui/LoadingState'
 import { useSiteContext } from '../contexts/SiteContext'
-import { useAlertSummary } from '../hooks/useAlerts'
-import { useQuery } from '@tanstack/react-query'
-import { api } from '../lib/api'
+import { useAlertSummary, useAllAlerts } from '../hooks/useAlerts'
 
 export default function OpsHome() {
   const navigate = useNavigate()
   const { facilities, isLoading } = useSiteContext()
   const { data: alertSummary } = useAlertSummary()
 
-  // Pull active alerts from the first facility to populate the feed;
-  // fleet-wide alert listing is on the dedicated /alerts page.
-  const firstFacilityId = facilities[0]?.id
-  const { data: alertsData } = useQuery({
-    queryKey: ['alerts', 'list', firstFacilityId, 'active'],
-    queryFn: () => api.listAlerts(firstFacilityId!, { state: 'active', limit: 8 }),
-    enabled: !!firstFacilityId,
-    refetchInterval: 30_000,
-  })
+  // Org-wide active alerts, ranked by severity — highest risk floats to top
+  const { data: alertsData } = useAllAlerts({ state: 'active' })
 
   const totalAlerts = alertSummary?.total_active ?? 0
   const criticalAlerts = alertSummary?.by_severity?.critical ?? 0
@@ -32,7 +23,10 @@ export default function OpsHome() {
 
   if (isLoading) return <LoadingState />
 
-  const activeAlerts = alertsData?.alerts ?? []
+  const sevRank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
+  const activeAlerts = [...(alertsData?.alerts ?? [])]
+    .sort((a, b) => (sevRank[a.severity] ?? 9) - (sevRank[b.severity] ?? 9))
+    .slice(0, 8)
 
   return (
     <div className="page-container">

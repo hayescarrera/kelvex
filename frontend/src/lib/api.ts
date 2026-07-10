@@ -2533,6 +2533,7 @@ export interface MaintenanceTaskEntry {
   priority: string
   equipment_id: string | null
   compressor_id: string | null
+  source_alert_id: string | null
   is_recurring: boolean
   recurrence_days: number | null
   recurrence_hours: number | null

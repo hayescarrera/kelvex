@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { AlertTriangle, Bell, CheckCircle, Filter, Shield, Clock, Wrench } from 'lucide-react'
@@ -9,7 +10,7 @@ import EmptyState from '../components/ui/EmptyState'
 import { useSiteContext } from '../contexts/SiteContext'
 import { useAlerts, useAllAlerts, useAlertSummary, useUpdateAlert } from '../hooks/useAlerts'
 import { api } from '../lib/api'
-import type { Alert } from '../lib/api'
+import type { Alert, MaintenanceTaskEntry } from '../lib/api'
 
 function formatCategory(cat: string) {
   return cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
@@ -70,10 +71,29 @@ export default function AlertsPage() {
     })
   }
 
+  const queryClient = useQueryClient()
+  const { data: taskData } = useQuery({
+    queryKey: ['maintenance-tasks', 'for-alerts'],
+    queryFn: () => api.listMaintenanceTasks({ limit: 200 }),
+    refetchInterval: 60_000,
+  })
+  const taskByAlert: Record<string, MaintenanceTaskEntry> = {}
+  taskData?.tasks?.forEach(t => { if (t.source_alert_id) taskByAlert[t.source_alert_id] = t })
+
+  const WO_LABEL: Record<string, string> = {
+    scheduled: 'WO scheduled', open: 'WO open', in_progress: 'WO in progress',
+    completed: 'WO completed', cancelled: 'WO cancelled',
+  }
+  const WO_CLASS: Record<string, string> = {
+    scheduled: 'dispatched', open: 'dispatched', in_progress: 'in_progress',
+    completed: 'closed', cancelled: '',
+  }
+
   const handleCreateWorkOrder = async (alertId: string) => {
     try {
       const task = await api.createWorkOrderFromAlert(alertId)
       toast.success(`Work order created: ${task.title}`)
+      queryClient.invalidateQueries({ queryKey: ['maintenance-tasks', 'for-alerts'] })
     } catch {
       toast.error('Failed to create work order')
     }
@@ -138,6 +158,7 @@ export default function AlertsPage() {
                       <th>Alert</th>
                       <th>Facility</th>
                       <th>State</th>
+                      <th>Work order</th>
                       <th>Time</th>
                     </tr>
                   </thead>
@@ -151,6 +172,29 @@ export default function AlertsPage() {
                         </td>
                         <td style={{ fontSize: 13 }}>{(alert as Alert & { facility_name: string }).facility_name}</td>
                         <td><span className={`badge ${stateBadge(alert.state)}`}>{alert.state}</span></td>
+                        <td>
+                          {taskByAlert[alert.id] ? (
+                            <Link
+                              to="/maintenance"
+                              className={`wo-chip ${WO_CLASS[taskByAlert[alert.id].state] ?? ''}`}
+                              title={taskByAlert[alert.id].title}
+                              style={{ textDecoration: 'none' }}
+                            >
+                              <Wrench size={10} /> {WO_LABEL[taskByAlert[alert.id].state] ?? `WO ${taskByAlert[alert.id].state}`}
+                            </Link>
+                          ) : alert.state !== 'resolved' && (alert.severity === 'critical' || alert.severity === 'high') ? (
+                            <button
+                              className="btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: 3 }}
+                              onClick={() => handleCreateWorkOrder(alert.id)}
+                              title="Auto-generate maintenance work order from this alert"
+                            >
+                              <Wrench size={10} /> WO
+                            </button>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+                          )}
+                        </td>
                         <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatTime(alert.triggered_at)}</td>
                       </tr>
                     ))}
@@ -280,7 +324,16 @@ export default function AlertsPage() {
                               Resolve
                             </button>
                           )}
-                          {alert.state !== 'resolved' && (alert.severity === 'critical' || alert.severity === 'high') && (
+                          {taskByAlert[alert.id] ? (
+                            <Link
+                              to="/maintenance"
+                              className={`wo-chip ${WO_CLASS[taskByAlert[alert.id].state] ?? ''}`}
+                              title={taskByAlert[alert.id].title}
+                              style={{ textDecoration: 'none' }}
+                            >
+                              <Wrench size={10} /> {WO_LABEL[taskByAlert[alert.id].state] ?? `WO ${taskByAlert[alert.id].state}`}
+                            </Link>
+                          ) : alert.state !== 'resolved' && (alert.severity === 'critical' || alert.severity === 'high') && (
                             <button
                               className="btn-secondary"
                               style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: 3 }}

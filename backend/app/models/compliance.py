@@ -211,6 +211,11 @@ class MaintenanceTask(Base):
         String(50), default="preventive"
     )  # preventive, corrective, inspection, calibration
     priority: Mapped[str] = mapped_column(String(20), default="medium")  # low, medium, high, critical
+    # Provenance: the alert this work order was generated from, if any —
+    # lets the alert inbox show the WO lifecycle inline
+    source_alert_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("alerts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # Equipment target
     equipment_id: Mapped[uuid.UUID | None] = mapped_column(

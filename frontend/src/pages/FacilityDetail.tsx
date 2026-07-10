@@ -2,6 +2,10 @@ import { useRef, useState, useEffect } from 'react'
 import { useParams, Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { Upload, Edit3, Loader2, X } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
+import HealthRing, { computeHealth } from '../components/ui/HealthRing'
+import { useAlerts } from '../hooks/useAlerts'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '../lib/api'
 import LoadingState from '../components/ui/LoadingState'
 import { useFacility, useUpdateFacility } from '../hooks/useFacilities'
 import { useUploadBills } from '../hooks/useBills'
@@ -22,6 +26,23 @@ export default function FacilityDetail() {
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
   const { data: facility, isLoading } = useFacility(facilityId!)
+
+  // Header health score — same formula as the fleet dashboard
+  const { data: facAlerts } = useAlerts(facilityId, { state: 'active' })
+  const { data: refDash } = useQuery({
+    queryKey: ['refrigerant-dashboard', facilityId],
+    queryFn: () => api.getRefrigerantDashboard(facilityId),
+    enabled: !!facilityId,
+    refetchInterval: 60_000,
+  })
+  const activeFacAlerts = facAlerts?.alerts ?? []
+  const perFac = refDash?.per_facility?.find(pf => pf.facility_id === facilityId)
+  const healthScore = computeHealth({
+    criticalAlerts: activeFacAlerts.filter(a => a.severity === 'critical').length,
+    highAlerts: activeFacAlerts.filter(a => a.severity === 'high').length,
+    openLeaks: perFac?.open_leaks ?? refDash?.open_leak_events ?? 0,
+    leakRatePct: perFac?.leak_rate_pct ?? null,
+  })
   const uploadBills = useUploadBills(facilityId!)
   const updateFacility = useUpdateFacility(facilityId!)
   const { setSite } = useSiteContext()
@@ -80,12 +101,17 @@ export default function FacilityDetail() {
     <div className="page-container">
       <input ref={fileRef} type="file" accept=".csv" onChange={handleUpload} style={{ display: 'none' }} />
 
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+        <div style={{ paddingTop: 4 }}><HealthRing score={healthScore} size={52} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
       <PageHeader title={facility?.name ?? 'Facility'} subtitle={subtitle || undefined} backAction={() => navigate('/')}>
         <button className="btn-secondary" onClick={openEditModal}><Edit3 size={14} /> Edit</button>
         <button className="btn-primary" onClick={() => fileRef.current?.click()} disabled={uploadBills.isPending}>
           {uploadBills.isPending ? <><Loader2 size={14} className="spin" /> Uploading...</> : <><Upload size={14} /> Upload Bill</>}
         </button>
       </PageHeader>
+        </div>
+      </div>
 
       <div className="tab-bar">
         {TABS.map(({ label, to }) => (

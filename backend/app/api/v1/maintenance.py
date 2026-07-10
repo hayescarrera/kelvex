@@ -81,6 +81,7 @@ def _task_to_dict(t: MaintenanceTask) -> dict:
         "priority": t.priority,
         "equipment_id": str(t.equipment_id) if t.equipment_id else None,
         "compressor_id": str(t.compressor_id) if t.compressor_id else None,
+        "source_alert_id": str(t.source_alert_id) if t.source_alert_id else None,
         "is_recurring": t.is_recurring,
         "recurrence_days": t.recurrence_days,
         "recurrence_hours": t.recurrence_hours,
@@ -312,6 +313,8 @@ async def create_task_from_alert(
         category=category,
         priority=priority,
         due_date=due_date,
+        source_alert_id=alert.id,
+        equipment_id=alert.equipment_id,
     )
     db.add(task)
     await db.commit()
