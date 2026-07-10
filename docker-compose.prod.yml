@@ -74,7 +74,7 @@ services:
       AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-5}
       API_RATE_LIMIT_PER_MINUTE: ${API_RATE_LIMIT_PER_MINUTE:-100}
       AGENT_RATE_LIMIT_PER_MINUTE: ${AGENT_RATE_LIMIT_PER_MINUTE:-600}
-      # Pool budget: 4 workers × (5+5) = 40 conns, under PG max_connections
+      # Pool budget: workers × (5+5) conns must stay under PG max_connections
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
       # Invite-only registration
@@ -98,7 +98,7 @@ services:
     command: >
       gunicorn app.main:app
         --worker-class uvicorn.workers.UvicornWorker
-        --workers 4
+        --workers ${GUNICORN_WORKERS:-2}
         --bind 0.0.0.0:8000
         --timeout 120
         --graceful-timeout 30
