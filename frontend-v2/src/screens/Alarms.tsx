@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { alarms, assets, sites, ackAlarm, snoozeAlarm, assignAlarm, annotateAlarm } from "../mock/engine";
+import { alarms, assets, sites, ackAlarm, snoozeAlarm, assignAlarm, annotateAlarm, woStateFor, advanceWorkOrder } from "../mock/engine";
 import { useLiveTick } from "../mock/useLive";
 import { EmptyState, ScreenGuide, StatusPill } from "../components/core";
 import { ago } from "../lib/format";
@@ -74,7 +74,7 @@ export function Alarms() {
         <div className="panel" style={{ overflow: "hidden" }}>
           <table className="table">
             <thead>
-              <tr><th style={{ width: 110 }}>Severity</th><th>Alarm</th><th>Asset</th><th>Raised</th><th>State</th><th style={{ width: 260 }}>Actions</th></tr>
+              <tr><th style={{ width: 110 }}>Severity</th><th>Alarm</th><th>Asset</th><th>Raised</th><th>Work order</th><th>State</th><th style={{ width: 260 }}>Actions</th></tr>
             </thead>
             <tbody>
               {rows.map((a, i) => {
@@ -103,6 +103,22 @@ export function Alarms() {
                       <div style={{ fontSize: "var(--text-xs)", color: "var(--ink-3)", paddingLeft: 12 }}>{site?.name}</div>
                     </td>
                     <td className="num" style={{ fontSize: "var(--text-xs)" }}>{ago(a.raisedAt)}</td>
+                    <td>
+                      {(() => {
+                        const wo = woStateFor(a.id);
+                        const label = { alert: "Alert", dispatched: "Dispatched", in_progress: "In progress", closed: "Closed" }[wo];
+                        return (
+                          <div style={{ display: "grid", gap: 4, justifyItems: "start" }}>
+                            <span className={`wo-chip ${wo}`}>{label}</span>
+                            {wo !== "closed" && (
+                              <button className="btn sm ghost" onClick={(e) => { e.stopPropagation(); advanceWorkOrder(a.id); }}>
+                                → {{ alert: "Dispatch", dispatched: "Start work", in_progress: "Close" }[wo]}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td>
                       {a.state === "active" && <StatusPill level="warning" label="Active" />}
                       {a.state === "acknowledged" && <StatusPill level="info" label={`Ack · ${a.ackBy}`} />}

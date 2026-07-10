@@ -275,3 +275,101 @@ export function annotateAlarm(id: string, note: string) {
 export function isStale(s: SensorPoint, at = Date.now()): boolean {
   return at - s.lastUpdate > s.staleAfterMin * 60_000;
 }
+
+// ── Work-order lifecycle (alert → dispatched → in progress → closed) ──
+export type WoState = "alert" | "dispatched" | "in_progress" | "closed";
+export const workOrders = new Map<string, WoState>([
+  ["al-1", "dispatched"],
+  ["al-3", "closed"],
+]);
+export function woStateFor(alarmId: string): WoState {
+  return workOrders.get(alarmId) ?? "alert";
+}
+export function advanceWorkOrder(alarmId: string) {
+  const order: WoState[] = ["alert", "dispatched", "in_progress", "closed"];
+  const cur = woStateFor(alarmId);
+  const next = order[Math.min(order.indexOf(cur) + 1, order.length - 1)];
+  workOrders.set(alarmId, next);
+  emit();
+}
+
+// ── Site health score (0–100), the category-standard rollup ──────────
+export function siteHealth(siteId: string): number {
+  let score = 100;
+  for (const a of alarms.filter((x) => x.siteId === siteId && x.state === "active")) {
+    score -= a.severity === "critical" ? 25 : a.severity === "warning" ? 10 : 3;
+  }
+  for (const s of sensors) {
+    const asset = assets.find((x) => x.id === s.assetId);
+    if (asset?.siteId === siteId && isStale(s)) score -= 8;
+  }
+  for (const l of leakEvents.filter((x) => x.siteId === siteId && x.stage !== "closed")) {
+    const days = (l.repairDeadline - Date.now()) / 86_400_000;
+    score -= days < 0 ? 30 : days <= 7 ? 18 : 10;
+  }
+  const agent = agents.find((a) => a.siteId === siteId);
+  if (agent && agent.state !== "connected") score -= 12;
+  return Math.max(0, Math.round(score));
+}
+
+// ── Compressor failure probability (ranked queue, highest risk first) ─
+const baseFailureProb: Record<string, number> = {
+  "a-chi-c3": 0.62,  // short-cycling
+  "a-mke-c1": 0.31,  // high runtime hours
+  "a-chi-c2": 0.12,
+  "a-chi-c1": 0.07,
+  "a-dal-c1": 0.05,
+};
+export function failureProb(assetId: string): number | null {
+  const p = baseFailureProb[assetId];
+  return p == null ? null : Math.min(0.99, p + Math.sin(Date.now() / 600_000) * 0.02);
+}
+export function rankedCompressors() {
+  return assets
+    .filter((a) => a.kind === "compressor")
+    .map((a) => ({ asset: a, prob: failureProb(a.id) ?? 0 }))
+    .sort((x, y) => y.prob - x.prob);
+}
+
+// ── Needs-attention queue: everything urgent, ranked ─────────────────
+export interface AttentionItem {
+  id: string;
+  rank: number;              // higher = more urgent
+  kind: "alarm" | "leak" | "stale" | "compressor";
+  title: string;
+  detail: string;
+  siteId: string;
+  href: string;
+}
+export function needsAttention(): AttentionItem[] {
+  const items: AttentionItem[] = [];
+  for (const a of alarms.filter((x) => x.state === "active")) {
+    items.push({
+      id: `at-${a.id}`,
+      rank: a.severity === "critical" ? 100 : a.severity === "warning" ? 60 : 20,
+      kind: "alarm", title: a.title, detail: a.detail, siteId: a.siteId,
+      href: "/alarms",
+    });
+  }
+  for (const l of leakEvents.filter((x) => x.stage !== "closed")) {
+    const days = Math.ceil((l.repairDeadline - Date.now()) / 86_400_000);
+    items.push({
+      id: `at-${l.id}`,
+      rank: days < 0 ? 120 : days <= 7 ? 90 : 55,
+      kind: "leak", title: `Repair window: ${days}d left on ${l.circuitName}`,
+      detail: `${l.lbsLost} lb lost · ${l.missingToClose.length} items missing to close`,
+      siteId: l.siteId, href: "/leaks",
+    });
+  }
+  for (const { asset, prob } of rankedCompressors()) {
+    if (prob >= 0.3) {
+      items.push({
+        id: `at-fp-${asset.id}`, rank: Math.round(prob * 80),
+        kind: "compressor", title: `${asset.name} failure risk ${(prob * 100).toFixed(0)}%`,
+        detail: "Ranked by failure probability from live health scoring",
+        siteId: asset.siteId, href: `/assets/${asset.id}`,
+      });
+    }
+  }
+  return items.sort((a, b) => b.rank - a.rank);
+}

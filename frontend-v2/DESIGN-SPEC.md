@@ -1,99 +1,44 @@
-# Kelvex Ops — Design Spec
+# Kelvex Ops — Design Spec (v3, category-standard)
 
-The app for people who have stood in a cold room at 2am. Two first-class
-users: a tech on a gloved tablet in a 34°F warehouse, and a compliance lead
-on an office laptop. One product, two presentations (see MODES.md).
+Modeled on the vertical-SaaS operator dashboards this market already trusts
+(Axiom Cloud's single pane of glass; Samsara-class visual language): light
+theme, white cards on a gray canvas, blue primary, and prioritization as
+the core design idea — health scores and ranked queues over decoration.
 
-## Token system
+## Visual language
 
-All values live in `src/styles/tokens.css` as CSS custom properties on
-`<html>`, switched by five attributes:
+- **Light theme default** (`data-theme` supports dark for overnight use)
+- Canvas `#f6f7f9`, white cards, 1px `#e6e9ef` borders, 10px radii, soft
+  two-layer shadows
+- Inter for UI (global tabular numerals), Space Grotesk for headings and
+  display numbers, JetBrains Mono for telemetry/IDs
+- Status colors (red/amber/green/blue/slate) reserved exclusively for
+  state; user accent choice can never repaint them
 
-| Attribute | Values | Default |
-|---|---|---|
-| `data-mode` | `field` \| `command` | command |
-| `data-theme` | `dark` \| `light` (from `system` pref) | dark |
-| `data-density` | `compact` \| `comfortable` \| `spacious` | comfortable |
-| `data-motion` | `full` \| `reduced` \| `none` | system `prefers-reduced-motion` |
-| `data-accent` | `blue` \| `cyan` \| `violet` \| `teal` | blue |
+## Signature constructs (the Axiom-class patterns)
 
-Prefs persist per user (`src/state/prefs.ts`, zustand + persist; production
-hydrates the same shape from the API). Switching is attribute assignment —
-no reload, no remount.
+1. **Site health score (0–100)** — rolls up alarms, stale sensors, leak
+   clocks, gateway state; ring gauge on dashboard + site header
+2. **Needs-attention queue** — every urgent thing (alarms, repair
+   deadlines, failure risk) in one list, ranked; work top to bottom
+3. **Compressors ranked by failure probability** — highest risk floats to
+   the top, red/amber/green probability bars
+4. **Work-order lifecycle chips** — alert → dispatched → in progress →
+   closed, advanced inline from the alarm inbox
+5. **KPI cards with period deltas** — ▲/▼ movement vs prior period
 
-### Color
+## Kept from v2 (substance, not style)
 
-- Anchored on the deep-blue instrument aesthetic of kelvex.io.
-- Dark theme surfaces: `#070b14 → #0c1220 → #111a2e → #17223a` (page →
-  panel → raised → highest). Field mode collapses the top two.
-- **Status colors are sacred**: red `#ef4444`, amber `#f59e0b`, green
-  `#22c55e`, info `#38bdf8`, stale `#8b93a7`. Reserved exclusively for
-  state; unreachable by accent/theme/mode.
+Provenance popovers on every number · stale = desaturated + timestamped +
+labeled · repair clock follows the asset everywhere · critical states
+render with transitions disabled in CSS · icon+text+color for all status ·
+⌘K palette · keyboard triage (J/K/A/S/N) · HelpTip compliance explainers ·
+"What can I do here?" per screen · empty-states-as-tutorial · uPlot canvas
+charts with live tail and drag-zoom · mock engine for cold demos ·
+unit/timezone/density/motion preferences.
 
-### Type
+## Screens
 
-- **Space Grotesk** — display (headings, big numbers with character)
-- **Inter** — UI text, `font-feature-settings: "tnum"` globally
-- **JetBrains Mono** — telemetry values, timestamps, IDs (`.num`)
-- Tabular numerals on every numeric column, no exceptions.
-
-## Screen inventory
-
-| Route | Screen | Depth |
-|---|---|---|
-| `/` | Fleet overview — the "am I okay?" screen | full |
-| `/sites/:id` | Site detail — schematic (Command) / nested table (Field) | full |
-| `/assets/:id` | Asset detail — live charts, brush-zoom, setpoints, service history | full |
-| `/alarms` | Alarm inbox — triage-first, J/K/A/S/N keyboard flow | full |
-| `/leaks` | Leak events — stage track, repair clock, missing-to-close | full |
-| `/ledger` | Refrigerant ledger — charge, additions/recoveries, leak rates | full |
-| `/compliance` | AIM Act posture + inspector-exact export preview | full |
-| `/agents` | Edge agent health — connectivity, mapping progress | full |
-| `/admin` | Users, roles, sites, notification routing | functional |
-| `/preferences` | All user overrides | full |
-
-## Component list
-
-`StatusPill` · `TweenNumber` · `SensorValue` (provenance popover) ·
-`RepairClock` · `StatTile` · `EmptyState` · `HelpTip` (inline compliance
-explainers) · `ScreenGuide` ("What can I do here?") · `LiveChart` (uPlot,
-canvas, live tail, drag-zoom) · `CommandPalette` (⌘K) · `ShortcutsOverlay` ·
-`AppShell` (top bar with mode switch, nav)
-
-## Non-negotiables, and where they're enforced
-
-| Constraint | Enforcement |
-|---|---|
-| Alarm state never animates | `base.css`: `.pill.critical { transition: none !important; animation: none !important }` |
-| Stale looks stale | `isStale()` gates every `SensorValue`; `.stale-wash` + STALE pill + timestamp |
-| Repair clock always visible | `RepairClock` rendered on Fleet rollup, site rows, site tiles, asset header, leaks, compliance |
-| Every number has provenance | `SensorValue` popover: device, freshness, unit, raw/derived |
-| Nothing destructive without recourse | compliance records immutable; ledger corrections append |
-| Color never alone | `StatusPill` = glyph + label + color, used exclusively for state |
-
-## Discoverability
-
-- Empty states name what belongs, why, and the next action (`EmptyState`).
-- ⌘K palette reaches every screen, site, asset, and action by plain name.
-- `?` HelpTips define every compliance term in two sentences.
-- Every screen has a "What can I do here?" listing its capabilities.
-- `?` key shows the shortcut overlay; J/K/A/S/N drive the alarm inbox;
-  M toggles mode; G-then-F/A/L navigates.
-
-## Data layer
-
-`src/mock/engine.ts` simulates the fleet cold: 2s tick, mean-reverting
-telemetry with a daily cycle, ring-buffer history per sensor (uPlot-ready
-Float64Arrays), a defrost that advances, a compressor that short-cycles, a
-sensor that has been silent 22 minutes (stale path), a live alarm that fires
-~90s into a demo, and an open leak event whose 30-day clock sits at 6 days.
-Replace by implementing the same interfaces against the real API; screens
-subscribe through `useLiveTick()` (`useSyncExternalStore`).
-
-## Performance
-
-- uPlot canvas charts (no SVG re-render churn), seeded with 24h and tailing
-  live without allocation.
-- Skeleton-free: layouts are stable; states swap in place (no CLS).
-- Bundle: ~117KB gzipped including charts; single code-split point ready at
-  the router when screens grow.
+Dashboard · Site detail · Asset detail · Alarm inbox · Leak events ·
+Refrigerant ledger · Compliance & reporting (inspector-exact export
+preview) · Edge agents · Admin · Preferences.

@@ -1,7 +1,7 @@
 /**
  * Asset detail — live telemetry with brush-zoom charts, setpoints,
  * runtime, and the repair clock if this asset's circuit has an open leak.
- * A compressor tile breathes when running (Command + full motion only).
+ * A compressor tile breathes when running (full motion only).
  */
 import { useParams, useNavigate, NavLink } from "react-router-dom";
 import { assets, sensors, sites, leakEvents, seriesFor, isStale } from "../mock/engine";
@@ -106,7 +106,7 @@ export function AssetDetail() {
       </div>
 
       {/* Live charts with brush + zoom */}
-      <div style={{ display: "grid", gridTemplateColumns: prefs.mode === "field" ? "1fr" : "repeat(auto-fit, minmax(420px, 1fr))", gap: "var(--space-4)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: "var(--space-4)" }}>
         {assetSensors.slice(0, 4).map((s) => (
           <div key={s.id} className="panel" style={{ padding: "var(--space-4)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>

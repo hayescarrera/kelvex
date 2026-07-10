@@ -1,18 +1,17 @@
 /**
- * App shell: top bar (mode switch — instant, no reload), left nav,
- * command palette, shortcuts overlay. The mode toggle is the product's
- * signature move: one keystroke between Field and Command.
+ * App shell — category-standard chrome: white top bar with global search,
+ * labeled left sidebar, alarm/leak indicators, user chip. ⌘K everywhere.
  */
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { usePrefs, applyPrefsToDocument } from "../state/prefs";
 import { CommandPalette } from "../components/CommandPalette";
 import { alarms, leakEvents } from "../mock/engine";
 import { useLiveTick } from "../mock/useLive";
 import { StatusPill } from "../components/core";
+import { applyPrefsToDocument, usePrefs } from "../state/prefs";
 
 const NAV = [
-  { to: "/", label: "Fleet", icon: "▦" },
+  { to: "/", label: "Dashboard", icon: "▦" },
   { to: "/alarms", label: "Alarms", icon: "◆" },
   { to: "/leaks", label: "Leak events", icon: "◉" },
   { to: "/ledger", label: "Refrigerant", icon: "☰" },
@@ -24,11 +23,10 @@ const NAV = [
 function ShortcutsOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
   const rows: Array<[string, string]> = [
-    ["⌘K / Ctrl+K", "Command palette"],
-    ["M", "Toggle Field / Command mode"],
-    ["G then F / A / L", "Go to Fleet / Alarms / Leaks"],
-    ["A", "Acknowledge selected alarm"],
-    ["J / K", "Next / previous row"],
+    ["⌘K / Ctrl+K", "Search & commands"],
+    ["G then D / A / L", "Go to Dashboard / Alarms / Leaks"],
+    ["J / K", "Next / previous row (alarm inbox)"],
+    ["A / S / N", "Acknowledge / snooze / note selected alarm"],
     ["?", "This overlay"],
     ["Esc", "Close any overlay"],
   ];
@@ -54,7 +52,6 @@ function ShortcutsOverlay({ open, onClose }: { open: boolean; onClose: () => voi
 }
 
 export function AppShell() {
-  const prefs = usePrefs();
   const nav = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -73,10 +70,9 @@ export function AppShell() {
       if (typing) return;
       if (e.key === "?") { setShortcutsOpen((o) => !o); return; }
       if (e.key === "Escape") { setPaletteOpen(false); setShortcutsOpen(false); return; }
-      if (e.key.toLowerCase() === "m") { usePrefs.getState().toggleMode(); return; }
       if (e.key.toLowerCase() === "g") { goPending = true; setTimeout(() => (goPending = false), 800); return; }
       if (goPending) {
-        const map: Record<string, string> = { f: "/", a: "/alarms", l: "/leaks" };
+        const map: Record<string, string> = { d: "/", a: "/alarms", l: "/leaks" };
         const to = map[e.key.toLowerCase()];
         if (to) nav(to);
         goPending = false;
@@ -93,72 +89,91 @@ export function AppShell() {
   const openLeaks = leakEvents.filter((l) => l.stage !== "closed");
 
   return (
-    <div style={{ display: "grid", gridTemplateRows: "auto 1fr", height: "100%" }}>
-      {/* ── Top bar ── */}
-      <header
-        style={{
-          display: "flex", alignItems: "center", gap: "var(--space-4)",
-          padding: "0 var(--space-4)", height: 60,
-          borderBottom: "var(--border-w) solid var(--line-1)",
-          background: "var(--surface-glass)",
-          backdropFilter: "blur(var(--glass-blur))",
-          position: "sticky", top: 0, zIndex: 40,
-        }}
-      >
-        <NavLink to="/" style={{ textDecoration: "none", display: "flex", alignItems: "baseline", gap: 8 }}>
-          <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 18, letterSpacing: "0.08em" }}>KELVEX</span>
-          <span className="num" style={{ fontSize: "var(--text-xs)", color: "var(--ink-3)" }}>ops</span>
+    <div style={{ display: "grid", gridTemplateColumns: "216px 1fr", height: "100%" }}>
+      {/* ── Sidebar ── */}
+      <nav aria-label="Primary" style={{
+        display: "flex", flexDirection: "column",
+        borderRight: "1px solid var(--line-1)", background: "var(--surface-1)",
+        padding: "var(--space-4) var(--space-3)",
+      }}>
+        <NavLink to="/" style={{ textDecoration: "none", display: "flex", alignItems: "baseline", gap: 8, padding: "0 var(--space-2) var(--space-4)" }}>
+          <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 17, letterSpacing: "0.06em" }}>KELVEX</span>
         </NavLink>
-
-        {/* Mode switch — the signature control. Instant. */}
-        <div className="seg" role="group" aria-label="Display mode">
-          <button aria-pressed={prefs.mode === "field"} onClick={() => prefs.set("mode", "field")}>FIELD</button>
-          <button aria-pressed={prefs.mode === "command"} onClick={() => prefs.set("mode", "command")}>COMMAND</button>
-        </div>
-
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-          {criticalCount > 0 && (
-            <NavLink to="/alarms" style={{ textDecoration: "none" }}>
-              <StatusPill level="critical" label={`${criticalCount} critical`} />
-            </NavLink>
-          )}
-          {openLeaks.length > 0 && (
-            <NavLink to="/leaks" style={{ textDecoration: "none" }}>
-              <StatusPill level="warning" label={`${openLeaks.length} open leak`} />
-            </NavLink>
-          )}
-          <button className="btn sm" onClick={() => setPaletteOpen(true)} aria-label="Open command palette">
-            ⌘K <span className="icon-label">Search</span>
-          </button>
-          <NavLink to="/preferences" className="btn sm ghost" aria-label="Preferences" style={{ textDecoration: "none" }}>
-            ⚙ <span className="icon-label">Preferences</span>
+        {NAV.map((n) => (
+          <NavLink
+            key={n.to} to={n.to} end={n.to === "/"}
+            style={({ isActive }) => ({
+              display: "flex", alignItems: "center", gap: 10,
+              minHeight: 38, padding: "0 var(--space-3)",
+              borderRadius: "var(--radius-sm)", textDecoration: "none",
+              fontWeight: 550, fontSize: "var(--text-sm)",
+              color: isActive ? "var(--accent-strong)" : "var(--ink-2)",
+              background: isActive ? "var(--accent-soft)" : "transparent",
+              marginBottom: 2,
+            })}
+          >
+            <span aria-hidden style={{ width: 16, textAlign: "center" }}>{n.icon}</span>
+            {n.label}
+            {n.to === "/alarms" && activeAlarms.length > 0 && (
+              <span className="num" style={{
+                marginLeft: "auto", fontSize: 11, fontWeight: 700,
+                background: criticalCount ? "var(--status-critical)" : "var(--status-warning)",
+                color: "#fff", borderRadius: 999, padding: "1px 7px",
+              }}>{activeAlarms.length}</span>
+            )}
           </NavLink>
+        ))}
+        <div style={{ marginTop: "auto", borderTop: "1px solid var(--line-1)", paddingTop: "var(--space-3)" }}>
+          <NavLink to="/preferences" style={({ isActive }) => ({
+            display: "flex", alignItems: "center", gap: 10, minHeight: 38,
+            padding: "0 var(--space-3)", borderRadius: "var(--radius-sm)",
+            textDecoration: "none", fontWeight: 550, fontSize: "var(--text-sm)",
+            color: isActive ? "var(--accent-strong)" : "var(--ink-2)",
+            background: isActive ? "var(--accent-soft)" : "transparent",
+          })}>
+            <span aria-hidden style={{ width: 16, textAlign: "center" }}>☼</span>
+            Preferences
+          </NavLink>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "var(--space-3) var(--space-3) 0" }}>
+            <span aria-hidden style={{
+              width: 28, height: 28, borderRadius: "50%", background: "var(--accent-soft)",
+              color: "var(--accent-strong)", display: "inline-flex", alignItems: "center",
+              justifyContent: "center", fontWeight: 700, fontSize: 12,
+            }}>BL</span>
+            <div style={{ lineHeight: 1.25 }}>
+              <div style={{ fontSize: "var(--text-xs)", fontWeight: 650 }}>Ben Linder</div>
+              <div style={{ fontSize: 10.5, color: "var(--ink-3)" }}>Owner</div>
+            </div>
+          </div>
         </div>
-      </header>
+      </nav>
 
-      {/* ── Body ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", minHeight: 0 }}>
-        <nav aria-label="Primary" style={{ borderRight: "var(--border-w) solid var(--line-1)", padding: "var(--space-3) var(--space-2)", background: "var(--surface-1)", minWidth: prefs.mode === "field" ? 170 : 150 }}>
-          {NAV.map((n) => (
-            <NavLink
-              key={n.to} to={n.to} end={n.to === "/"}
-              style={({ isActive }) => ({
-                display: "flex", alignItems: "center", gap: 10,
-                minHeight: "var(--hit)", padding: "0 var(--space-3)",
-                borderRadius: "var(--radius-sm)", textDecoration: "none",
-                fontWeight: 550, fontSize: "var(--text-sm)",
-                color: isActive ? "var(--ink-1)" : "var(--ink-2)",
-                background: isActive ? "var(--accent-soft)" : "transparent",
-                borderLeft: isActive ? "3px solid var(--accent)" : "3px solid transparent",
-                marginBottom: 2,
-              })}
-            >
-              <span aria-hidden style={{ width: 16, textAlign: "center" }}>{n.icon}</span>
-              {n.label}
-            </NavLink>
-          ))}
-        </nav>
-        <main style={{ overflow: "auto", padding: "var(--space-5)", minWidth: 0 }}>
+      {/* ── Main column ── */}
+      <div style={{ display: "grid", gridTemplateRows: "auto 1fr", minWidth: 0 }}>
+        <header style={{
+          display: "flex", alignItems: "center", gap: "var(--space-3)",
+          padding: "0 var(--space-5)", height: 56,
+          borderBottom: "1px solid var(--line-1)", background: "var(--surface-1)",
+        }}>
+          <button className="btn sm" onClick={() => setPaletteOpen(true)}
+            style={{ color: "var(--ink-3)", fontWeight: 450, minWidth: 260, justifyContent: "flex-start" }}
+            aria-label="Search sites, assets, actions">
+            🔍 Search sites, assets, actions… <kbd className="num" style={{ marginLeft: "auto", fontSize: 10.5, border: "1px solid var(--line-2)", borderRadius: 4, padding: "0 5px" }}>⌘K</kbd>
+          </button>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            {criticalCount > 0 && (
+              <NavLink to="/alarms" style={{ textDecoration: "none" }}>
+                <StatusPill level="critical" label={`${criticalCount} critical`} />
+              </NavLink>
+            )}
+            {openLeaks.length > 0 && (
+              <NavLink to="/leaks" style={{ textDecoration: "none" }}>
+                <StatusPill level="warning" label={`${openLeaks.length} open leak`} />
+              </NavLink>
+            )}
+          </div>
+        </header>
+        <main style={{ overflow: "auto", padding: "var(--space-5)", minWidth: 0, background: "var(--surface-0)" }}>
           <Outlet />
         </main>
       </div>

@@ -36,16 +36,34 @@ input, select, textarea { font: inherit; color: inherit; }
   background: var(--surface-1);
   border: var(--border-w) solid var(--line-1);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-1), var(--inner-stroke);
-  background-image: var(--tile-gradient);
+  box-shadow: var(--shadow-1);
 }
 .panel-2 {
   background: var(--surface-2);
   border: var(--border-w) solid var(--line-1);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-1), var(--inner-stroke);
-  background-image: var(--tile-gradient);
+  box-shadow: var(--shadow-1);
 }
+
+/* ── Health ring (site / compressor scores) ─────────────────────── */
+.ring { position: relative; display: inline-grid; place-items: center; }
+.ring svg { transform: rotate(-90deg); }
+.ring .val { position: absolute; font-family: var(--font-display); font-weight: 600; }
+
+/* ── Delta chips (vs prior period) ──────────────────────────────── */
+.delta { display: inline-flex; align-items: center; gap: 3px; font-size: var(--text-xs);
+  font-weight: 650; border-radius: 6px; padding: 2px 7px; }
+.delta.good { color: var(--status-ok); background: var(--status-ok-bg); }
+.delta.bad { color: var(--status-critical); background: var(--status-critical-bg); }
+.delta.flat { color: var(--ink-3); background: var(--surface-0); }
+
+/* ── Work-order lifecycle chips ─────────────────────────────────── */
+.wo-chip { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-xs);
+  font-weight: 600; border-radius: 999px; padding: 3px 10px; border: 1px solid var(--line-2);
+  color: var(--ink-2); background: var(--surface-1); white-space: nowrap; }
+.wo-chip.dispatched { color: var(--status-info); border-color: var(--status-info); background: var(--status-info-bg); }
+.wo-chip.in_progress { color: var(--status-warning); border-color: var(--status-warning); background: var(--status-warning-bg); }
+.wo-chip.closed { color: var(--status-ok); border-color: var(--status-ok); background: var(--status-ok-bg); }
 
 /* ── Buttons ────────────────────────────────────────────────────── */
 .btn {
@@ -162,8 +180,6 @@ input, select, textarea { font: inherit; color: inherit; }
 .breathe { animation: breathe 3.2s ease-in-out infinite; animation-play-state: running; }
 :root[data-mode="field"] .breathe, :root[data-motion="none"] .breathe, :root[data-motion="reduced"] .breathe { animation: none; opacity: 1; }
 
-/* Field mode: text labels beside icons */
-.icon-label { display: var(--label-icons, none); }
 
 /* Scrollbars */
 ::-webkit-scrollbar { width: 10px; height: 10px; }

@@ -41,24 +41,19 @@ export function Preferences() {
         <h1 style={{ fontSize: 24 }}>Preferences</h1>
         <ScreenGuide items={[
           "Everything here persists to your account and follows you across devices",
-          "Field mode: rugged, flat, big targets — built for gloves and glare",
-          "Command mode: the full instrument — depth, live motion, schematics",
           "Semantic status colors (red/amber/green) are never affected by these settings",
         ]} />
       </div>
 
       <section className="panel" style={{ padding: "var(--space-5)" }}>
         <h2 style={{ fontSize: 16, marginBottom: "var(--space-3)" }}>Display</h2>
-        <Row label="Mode" hint="Also toggled with M, or from the top bar. Instant — no reload.">
-          <Seg k="mode" options={[{ v: "field", label: "FIELD" }, { v: "command", label: "COMMAND" }]} />
-        </Row>
-        <Row label="Density" hint="Field mode enforces a minimum row height for glove targets.">
+        <Row label="Density" hint="Row height and spacing across every table and list.">
           <Seg k="density" options={[{ v: "compact", label: "COMPACT" }, { v: "comfortable", label: "COMFORTABLE" }, { v: "spacious", label: "SPACIOUS" }]} />
         </Row>
         <Row label="Motion" hint="Defaults to your system's reduced-motion setting. Alarm states never animate regardless.">
           <Seg k="motion" options={[{ v: "full", label: "FULL" }, { v: "reduced", label: "REDUCED" }, { v: "none", label: "NONE" }]} />
         </Row>
-        <Row label="Theme" hint="Dark is the control-room default.">
+        <Row label="Theme" hint="Light matches the rest of your tools; dark for overnight monitoring.">
           <Seg k="theme" options={[{ v: "dark", label: "DARK" }, { v: "light", label: "LIGHT" }, { v: "system", label: "SYSTEM" }]} />
         </Row>
         <Row label="Accent" hint="Never overrides status semantics.">

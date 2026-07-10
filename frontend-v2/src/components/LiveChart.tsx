@@ -84,7 +84,7 @@ export function LiveChart({ series, kind, height = 220, label, stale = false }: 
     return () => { ro.disconnect(); el.removeEventListener("dblclick", onDblClick); p.destroy(); plot.current = null; };
     // Recreate on style-affecting pref changes:
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefs.chartStyle, prefs.theme, prefs.mode, prefs.accent, height, stale]);
+  }, [prefs.chartStyle, prefs.theme, prefs.accent, height, stale]);
 
   // Live tail: update data in place unless the user has zoomed in.
   useEffect(() => {

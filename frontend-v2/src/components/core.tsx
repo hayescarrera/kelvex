@@ -28,7 +28,7 @@ export function StatusPill({ level, label }: { level: "critical" | "warning" | "
 // ── Tweening number (snaps in Field mode / motion none) ─────────────
 export function TweenNumber({ value, kind, decimals = 1 }: { value: number | null; kind: Kind; decimals?: number }) {
   const prefs = usePrefs();
-  const tween = prefs.mode === "command" && prefs.motion === "full";
+  const tween = prefs.motion === "full";
   const [shown, setShown] = useState(value);
   const raf = useRef(0);
 
@@ -192,5 +192,34 @@ export function StatTile({ label, value, sub, level }: {
       <div style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 600, lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: "var(--text-xs)", color: "var(--ink-2)", marginTop: 6 }}>{sub}</div>}
     </div>
+  );
+}
+
+// ── Health ring: the category-standard 0-100 rollup ─────────────────
+export function HealthRing({ score, size = 52 }: { score: number; size?: number }) {
+  const r = (size - 8) / 2;
+  const c = 2 * Math.PI * r;
+  const color = score >= 85 ? "var(--status-ok)" : score >= 60 ? "var(--status-warning)" : "var(--status-critical)";
+  return (
+    <span className="ring" role="img" aria-label={`Health score ${score} out of 100`}>
+      <svg width={size} height={size}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line-1)" strokeWidth={5} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={5}
+          strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - score / 100)}
+          style={{ transition: "stroke-dashoffset var(--dur-slow) var(--ease-out)" }} />
+      </svg>
+      <span className="val num" style={{ fontSize: size * 0.3, color }}>{score}</span>
+    </span>
+  );
+}
+
+// ── Delta chip vs prior period ───────────────────────────────────────
+export function Delta({ value, goodWhenDown = false, suffix = "%" }: { value: number; goodWhenDown?: boolean; suffix?: string }) {
+  const up = value > 0;
+  const good = value === 0 ? null : goodWhenDown ? !up : up;
+  return (
+    <span className={`delta ${good == null ? "flat" : good ? "good" : "bad"}`}>
+      {value === 0 ? "—" : up ? "▲" : "▼"} {Math.abs(value)}{suffix}
+    </span>
   );
 }

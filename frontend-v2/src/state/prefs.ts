@@ -9,7 +9,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type Mode = "field" | "command";
 export type Density = "compact" | "comfortable" | "spacious";
 export type Motion = "full" | "reduced" | "none";
 export type Theme = "dark" | "light" | "system";
@@ -21,7 +20,6 @@ export type TzMode = "site" | "user";
 export type ChartStyle = "line" | "step" | "area";
 
 export interface Prefs {
-  mode: Mode;
   density: Density;
   motion: Motion;
   theme: Theme;
@@ -39,7 +37,6 @@ export interface Prefs {
 
 interface PrefsStore extends Prefs {
   set: <K extends keyof Prefs>(key: K, value: Prefs[K]) => void;
-  toggleMode: () => void;
 }
 
 const systemPrefersReduced = () =>
@@ -47,10 +44,9 @@ const systemPrefersReduced = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const defaults: Prefs = {
-  mode: "command",
   density: "comfortable",
   motion: systemPrefersReduced() ? "reduced" : "full",
-  theme: "dark",
+  theme: "light",
   accent: "blue",
   tempUnit: "F",
   pressureUnit: "psi",
@@ -65,19 +61,17 @@ const defaults: Prefs = {
 
 export const usePrefs = create<PrefsStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       ...defaults,
       set: (key, value) => set({ [key]: value } as Partial<Prefs>),
-      toggleMode: () => set({ mode: get().mode === "field" ? "command" : "field" }),
     }),
-    { name: "kelvex-prefs" },
+    { name: "kelvex-prefs-v2" },
   ),
 );
 
 /** Reflect prefs onto <html> so CSS tokens react instantly. */
 export function applyPrefsToDocument(p: Prefs) {
   const el = document.documentElement;
-  el.dataset.mode = p.mode;
   el.dataset.density = p.density;
   el.dataset.motion = p.motion;
   el.dataset.accent = p.accent;

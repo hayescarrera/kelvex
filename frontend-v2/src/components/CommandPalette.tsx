@@ -40,8 +40,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       run: () => nav(`/assets/${a.id}`),
     })),
     {
-      id: "act-mode", title: `Switch to ${prefs.mode === "field" ? "Command" : "Field"} mode`,
-      hint: "instant, no reload", group: "Actions", run: () => prefs.toggleMode(),
+      id: "act-theme", title: `Switch to ${prefs.theme === "dark" ? "light" : "dark"} theme`,
+      hint: "instant, no reload", group: "Actions",
+      run: () => prefs.set("theme", prefs.theme === "dark" ? "light" : "dark"),
     },
     {
       id: "act-ack-all", title: "Acknowledge all active alarms", hint: "marks them seen, keeps them open",
