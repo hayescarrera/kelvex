@@ -11,11 +11,12 @@ import {
 } from 'recharts'
 import PageHeader from '../components/ui/PageHeader'
 import StatCard from '../components/ui/StatCard'
+import HealthRing, { computeHealth } from '../components/ui/HealthRing'
 import LoadingState from '../components/ui/LoadingState'
 import EmptyState from '../components/ui/EmptyState'
 import ChartTooltip from '../components/ui/ChartTooltip'
 import { useSiteContext } from '../contexts/SiteContext'
-import { useAlertSummary } from '../hooks/useAlerts'
+import { useAlertSummary, useAllAlerts } from '../hooks/useAlerts'
 import { useCreateFacility, useDeleteFacility } from '../hooks/useFacilities'
 import { api } from '../lib/api'
 import type { Zone, Bill, RefrigerantDashboard } from '../lib/api'
@@ -35,6 +36,7 @@ export default function FleetOverview() {
   // Landing on Portfolio always clears the active site
   useEffect(() => { setSite(null) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const { data: alertSummary } = useAlertSummary()
+  const { data: activeAlertsData } = useAllAlerts({ state: 'active' })
   const [showAddModal, setShowAddModal] = useState(false)
   const deleteFacility = useDeleteFacility()
 
@@ -115,6 +117,48 @@ export default function FleetOverview() {
   const peakDemand = portfolio.bills.reduce((max, b) => Math.max(max, Number(b.peak_demand_kw || 0)), 0)
 
   // Alert severity pie
+  // ── Per-facility health scores (real signals only) ──────────
+  const activeAlerts = activeAlertsData?.alerts ?? []
+  const perFacilityRef: Record<string, { open_leaks: number; leak_rate_pct: number | null }> = {}
+  portfolio.refrigerantDashboard?.per_facility?.forEach(pf => {
+    perFacilityRef[pf.facility_id] = { open_leaks: pf.open_leaks, leak_rate_pct: pf.leak_rate_pct }
+  })
+  const facilityHealth: Record<string, number> = {}
+  facilities.forEach(f => {
+    const fAlerts = activeAlerts.filter(a => a.facility_id === f.id)
+    facilityHealth[f.id] = computeHealth({
+      criticalAlerts: fAlerts.filter(a => a.severity === 'critical').length,
+      highAlerts: fAlerts.filter(a => a.severity === 'high').length,
+      zoneAlarms: facilityZoneAlarms[f.id] ?? 0,
+      openLeaks: perFacilityRef[f.id]?.open_leaks ?? 0,
+      leakRatePct: perFacilityRef[f.id]?.leak_rate_pct ?? null,
+    })
+  })
+
+  // ── Needs-attention queue: everything urgent, ranked ─────────
+  const facilityName = (id: string) => facilities.find(f => f.id === id)?.name ?? ''
+  const sevRank: Record<string, number> = { critical: 100, high: 70, medium: 40, low: 15, info: 5 }
+  const attention: { id: string; rank: number; kind: 'alarm' | 'leak'; title: string; sub: string; onClick: () => void }[] = [
+    ...activeAlerts.map(a => ({
+      id: `al-${a.id}`,
+      rank: sevRank[a.severity] ?? 10,
+      kind: 'alarm' as const,
+      title: a.title,
+      sub: [facilityName(a.facility_id), a.message].filter(Boolean).join(' · '),
+      onClick: () => navigate('/alerts'),
+    })),
+    ...(portfolio.refrigerantDashboard?.per_facility ?? [])
+      .filter(pf => pf.open_leaks > 0)
+      .map(pf => ({
+        id: `lk-${pf.facility_id}`,
+        rank: (pf.leak_rate_pct ?? 0) >= 20 ? 90 : 60,
+        kind: 'leak' as const,
+        title: `${pf.open_leaks} open leak event${pf.open_leaks !== 1 ? 's' : ''} — ${pf.name}`,
+        sub: pf.leak_rate_pct != null ? `annual leak rate ${pf.leak_rate_pct.toFixed(1)}% (threshold 20%)` : 'leak rate pending charge data',
+        onClick: () => navigate('/leak-tracking'),
+      })),
+  ].sort((a, b) => b.rank - a.rank).slice(0, 6)
+
   const alertPie = alertSummary ? [
     { name: 'Critical', value: alertSummary.by_severity.critical, color: '#ef4444' },
     { name: 'High', value: alertSummary.by_severity.high, color: '#f97316' },
@@ -150,6 +194,29 @@ export default function FleetOverview() {
 
       {/* ── Top Stats ──────────────────────────── */}
       <div className="stat-grid stagger">
+        {attention.length > 0 && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={15} /> Needs attention</h3>
+              <span className="text-muted" style={{ fontSize: 11.5 }}>ranked by urgency</span>
+            </div>
+            <div>
+              {attention.map((it, i) => (
+                <button key={it.id} className="attn-row" onClick={it.onClick}>
+                  <span className="num text-muted" style={{ fontSize: 11.5, marginTop: 3, width: 14 }}>{i + 1}</span>
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: 13.5, color: 'var(--text-primary)' }}>{it.title}</span>
+                    {it.sub && <span style={{ display: 'block', fontSize: 12, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.sub}</span>}
+                  </span>
+                  <span className={`badge ${it.kind === 'alarm' ? 'badge-danger' : 'badge-warning'}`} style={{ flexShrink: 0 }}>
+                    <span className="badge-dot" /> {it.kind}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <StatCard
           icon={<AlertTriangle size={18} />}
           color={totalAlerts > 0 ? 'var(--danger)' : 'var(--success)'}
@@ -404,10 +471,11 @@ export default function FleetOverview() {
           <div className="card">
             <div className="card-header"><h3>Facilities</h3></div>
             <table className="data-table">
-              <thead><tr><th>Facility</th><th>Location</th><th>Size</th><th>Equipment</th><th>Status</th><th style={{ width: 80 }}></th></tr></thead>
+              <thead><tr><th style={{ width: 64 }}>Health</th><th>Facility</th><th>Location</th><th>Size</th><th>Equipment</th><th>Status</th><th style={{ width: 80 }}></th></tr></thead>
               <tbody>
                 {facilities.map(f => (
                   <tr key={f.id} onClick={() => navigate(`/sites/${f.id}`)} style={{ cursor: 'pointer' }}>
+                    <td><HealthRing score={facilityHealth[f.id] ?? 100} size={38} /></td>
                     <td>
                       <div className="cell-with-icon">
                         <div className="table-icon"><Building2 size={14} /></div>
