@@ -1,0 +1,178 @@
+/* ════════════════════════════════════════════════════════════════════
+   KELVEX DESIGN TOKENS
+   One component tree, two modes, two themes, three densities.
+   Modes/themes/densities/motion are attribute swaps on <html>:
+     data-mode="field|command"  data-theme="dark|light"
+     data-density="compact|comfortable|spacious"  data-motion="full|reduced|none"
+     data-accent="blue|cyan|violet|teal"
+   Status colors are semantic and NEVER change with mode, theme, or accent.
+   ════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Primitives: type ─────────────────────────────────────────── */
+  --font-display: "Space Grotesk", sans-serif;
+  --font-ui: "Inter", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", monospace;
+
+  /* ── Primitives: motion (Command defaults) ────────────────────── */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ambient: 1;              /* 1 = ambient/decorative motion allowed */
+
+  /* ── Primitives: status (immutable across all modes/themes) ───── */
+  --status-critical: #ef4444;
+  --status-critical-bg: rgba(239, 68, 68, 0.12);
+  --status-warning: #f59e0b;
+  --status-warning-bg: rgba(245, 158, 11, 0.12);
+  --status-ok: #22c55e;
+  --status-ok-bg: rgba(34, 197, 94, 0.10);
+  --status-info: #38bdf8;
+  --status-info-bg: rgba(56, 189, 248, 0.10);
+  --status-stale: #8b93a7;
+  --status-stale-bg: rgba(139, 147, 167, 0.10);
+
+  /* ── Accent (user-selectable; never used for status) ──────────── */
+  --accent: #3b82f6;
+  --accent-strong: #2563eb;
+  --accent-soft: rgba(59, 130, 246, 0.14);
+  --accent-line: rgba(59, 130, 246, 0.45);
+
+  /* ── Density: comfortable defaults ─────────────────────────────── */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+  --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --row-h: 48px;              /* table rows / list rows */
+  --hit: 48px;                /* minimum interactive target */
+  --text-base: 15px;
+  --text-sm: 13px;
+  --text-xs: 11.5px;
+  --text-lg: 17px;
+  --leading: 1.55;
+}
+
+/* ── Accent variants ─────────────────────────────────────────────── */
+:root[data-accent="cyan"]   { --accent:#06b6d4; --accent-strong:#0891b2; --accent-soft:rgba(6,182,212,.14);  --accent-line:rgba(6,182,212,.45); }
+:root[data-accent="violet"] { --accent:#8b5cf6; --accent-strong:#7c3aed; --accent-soft:rgba(139,92,246,.14); --accent-line:rgba(139,92,246,.45); }
+:root[data-accent="teal"]   { --accent:#14b8a6; --accent-strong:#0d9488; --accent-soft:rgba(20,184,166,.14); --accent-line:rgba(20,184,166,.45); }
+
+/* ════════════════════════════════════════════════════════════════════
+   THEME — dark (default: a cold-storage app should feel like a control room)
+   ════════════════════════════════════════════════════════════════════ */
+:root, :root[data-theme="dark"] {
+  --surface-0: #070b14;        /* page */
+  --surface-1: #0c1220;        /* panels */
+  --surface-2: #111a2e;        /* raised: cards, popovers */
+  --surface-3: #17223a;        /* highest: menus, sheets */
+  --surface-glass: rgba(12, 18, 32, 0.82);
+  --ink-1: #e8edf8;            /* primary text */
+  --ink-2: #9aa6bf;            /* secondary */
+  --ink-3: #5d6a85;            /* tertiary / captions */
+  --line-1: #1c2740;           /* hairline */
+  --line-2: #2a3855;           /* stronger border */
+  --focus: #93c5fd;
+  --chart-grid: rgba(154, 166, 191, 0.12);
+  --scrim: rgba(2, 5, 10, 0.6);
+}
+
+:root[data-theme="light"] {
+  --surface-0: #f4f6fb;
+  --surface-1: #ffffff;
+  --surface-2: #ffffff;
+  --surface-3: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.85);
+  --ink-1: #101828;
+  --ink-2: #4a5670;
+  --ink-3: #7d879e;
+  --line-1: #e3e8f2;
+  --line-2: #c9d2e4;
+  --focus: #2563eb;
+  --chart-grid: rgba(16, 24, 40, 0.08);
+  --scrim: rgba(16, 24, 40, 0.35);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MODE — Command (default visual language: the full instrument)
+   ════════════════════════════════════════════════════════════════════ */
+:root, :root[data-mode="command"] {
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --border-w: 1px;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.25), 0 4px 16px -4px rgba(0,0,0,.35);
+  --shadow-2: 0 4px 12px rgba(0,0,0,.30), 0 16px 40px -12px rgba(0,0,0,.45);
+  --inner-stroke: inset 0 1px 0 rgba(255,255,255,.04);
+  --glass-blur: 14px;
+  --tile-gradient: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,0) 40%);
+  --label-icons: none;         /* icon-only affordances allowed */
+}
+
+:root[data-theme="light"][data-mode="command"] {
+  --shadow-1: 0 1px 2px rgba(16,24,40,.06), 0 4px 16px -4px rgba(16,24,40,.10);
+  --shadow-2: 0 4px 12px rgba(16,24,40,.08), 0 16px 40px -12px rgba(16,24,40,.18);
+  --inner-stroke: inset 0 1px 0 rgba(255,255,255,.6);
+  --tile-gradient: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0) 40%);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MODE — Field (rugged: hard borders, flat surfaces, bigger everything)
+   ════════════════════════════════════════════════════════════════════ */
+:root[data-mode="field"] {
+  --radius-sm: 2px;
+  --radius: 3px;
+  --radius-lg: 4px;
+  --border-w: 2px;
+  --shadow-1: none;
+  --shadow-2: none;
+  --inner-stroke: none;
+  --glass-blur: 0px;
+  --tile-gradient: none;
+  --ambient: 0;                /* no decorative motion, ever */
+  --label-icons: inline;       /* text labels on every icon */
+  /* Flatten surface layering; raise contrast */
+  --surface-2: var(--surface-1);
+  --surface-3: var(--surface-1);
+  --surface-glass: var(--surface-1);
+  --line-1: var(--line-2);
+  /* Bigger type + targets */
+  --text-base: 16px;
+  --text-sm: 14px;
+  --text-xs: 12.5px;
+  --text-lg: 18px;
+  --leading: 1.6;
+  --hit: 52px;
+}
+:root[data-mode="field"][data-theme="dark"] {
+  --ink-2: #b3bdd4;            /* lift secondary text for glare */
+  --line-2: #3a4a6e;
+}
+:root[data-mode="field"][data-theme="light"] {
+  --ink-2: #3c4a60;
+  --line-2: #9aa8c4;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DENSITY
+   ════════════════════════════════════════════════════════════════════ */
+:root[data-density="compact"] {
+  --space-3: 10px; --space-4: 12px; --space-5: 18px; --space-6: 24px;
+  --row-h: 38px; --text-base: 14px;
+}
+:root[data-mode="field"][data-density="compact"] { --row-h: 44px; --text-base: 15px; } /* field floor */
+:root[data-density="spacious"] {
+  --space-4: 20px; --space-5: 28px; --space-6: 40px;
+  --row-h: 56px;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MOTION
+   full     — everything, including ambient (Command only)
+   reduced  — functional feedback only (state changes)
+   none     — instant
+   ════════════════════════════════════════════════════════════════════ */
+:root[data-motion="reduced"] { --ambient: 0; }
+:root[data-motion="none"] {
+  --ambient: 0;
+  --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms;
+}
